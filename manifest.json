@@ -1,0 +1,16 @@
+{
+  "name": "Cascos Analytics — PezzaliApp",
+  "short_name": "Cascos Analytics",
+  "description": "Dashboard professionale vendite, ordini e analisi sconti Cascos / Cormach Srl",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#00b894",
+  "orientation": "any",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "it"
+}

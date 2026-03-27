@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cascos Analytics — PezzaliApp</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#121212" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --bg2: #141414;
+      --bg3: #1a1a1a;
+      --border: #2a2a2a;
+      --green: #00b894;
+      --green2: #00cba3;
+      --red: #e17055;
+      --yellow: #fdcb6e;
+      --blue: #74b9ff;
+      --purple: #a29bfe;
+      --text: #e8e8e8;
+      --text2: #888;
+      --text3: #555;
+      --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,13,13,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; height: 60px;
+    }
+    .topbar-logo { display: flex; align-items: center; gap: 10px; }
+    .topbar-logo svg { width: 28px; height: 28px; }
+    .topbar-logo span { font-weight: 700; font-size: 16px; letter-spacing: -0.3px; }
+    .topbar-logo .dot { color: var(--green); }
+    .topbar-right { display: flex; align-items: center; gap: 14px; }
+    .status-badge {
+      background: rgba(0,184,148,0.12);
+      color: var(--green);
+      border: 1px solid rgba(0,184,148,0.3);
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── UPLOAD SCREEN ── */
+    #upload-screen {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 20px;
+      background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(0,184,148,0.06) 0%, transparent 70%);
+    }
+    .upload-title {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 700; letter-spacing: -1px;
+      text-align: center; margin-bottom: 8px;
+    }
+    .upload-title em { color: var(--green); font-style: normal; }
+    .upload-subtitle {
+      color: var(--text2); font-size: 15px;
+      text-align: center; margin-bottom: 48px;
+      max-width: 480px; line-height: 1.6;
+    }
+    .upload-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+      gap: 16px; width: 100%; max-width: 780px; margin-bottom: 32px;
+    }
+    .upload-card {
+      background: var(--bg2);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      cursor: pointer; transition: all 0.25s ease;
+      position: relative; overflow: hidden;
+    }
+    .upload-card:hover, .upload-card.dragover {
+      border-color: var(--green);
+      background: rgba(0,184,148,0.05);
+    }
+    .upload-card.loaded {
+      border-color: var(--green);
+      border-style: solid;
+      background: rgba(0,184,148,0.07);
+    }
+    .upload-card input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .upload-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .upload-icon.green { background: rgba(0,184,148,0.15); }
+    .upload-icon.blue { background: rgba(116,185,255,0.15); }
+    .upload-icon.yellow { background: rgba(253,203,110,0.15); }
+    .upload-card-label { font-weight: 600; font-size: 14px; text-align: center; }
+    .upload-card-sub { color: var(--text2); font-size: 12px; text-align: center; }
+    .upload-card-check {
+      position: absolute; top: 12px; right: 12px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--green); color: #000;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; opacity: 0; transition: opacity 0.2s;
+    }
+    .upload-card.loaded .upload-card-check { opacity: 1; }
+    .btn-analyze {
+      background: var(--green); color: #000;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px; font-weight: 700;
+      border: none; border-radius: 10px;
+      padding: 14px 48px; cursor: pointer;
+      transition: all 0.2s; opacity: 0.4; pointer-events: none;
+      letter-spacing: 0.2px;
+    }
+    .btn-analyze.active { opacity: 1; pointer-events: all; }
+    .btn-analyze.active:hover { background: var(--green2); transform: translateY(-1px); }
+    .upload-note {
+      color: var(--text3); font-size: 12px; margin-top: 12px; text-align: center;
+    }
+
+    /* ── LOADING ── */
+    #loading-screen {
+      display: none; position: fixed; inset: 0;
+      background: var(--bg); z-index: 200;
+      flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-msg { color: var(--text2); font-size: 14px; font-weight: 500; }
+    .loading-sub { color: var(--text3); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+
+    /* ── DASHBOARD ── */
+    #dashboard { display: none; }
+
+    .dash-header {
+      padding: 28px 28px 0;
+      display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .dash-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .dash-title span { color: var(--green); }
+    .dash-period { color: var(--text2); font-size: 13px; margin-top: 4px; }
+    .btn-reset {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text2); font-family: 'Space Grotesk', sans-serif;
+      font-size: 12px; padding: 7px 16px; border-radius: 8px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-reset:hover { border-color: var(--text2); color: var(--text); }
+
+    /* ── NAV TABS ── */
+    .nav-tabs {
+      display: flex; gap: 4px;
+      padding: 16px 28px 0;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      background: transparent; border: none;
+      color: var(--text2); font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px; font-weight: 600;
+      padding: 10px 16px; cursor: pointer; border-radius: 8px 8px 0 0;
+      white-space: nowrap; transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text); background: var(--bg2); }
+    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); background: transparent; }
+
+    /* ── CONTENT ── */
+    .tab-panel { display: none; padding: 24px 28px; }
+    .tab-panel.active { display: block; }
+
+    /* ── KPI GRID ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px; margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .kpi-card:hover { border-color: var(--border); }
+    .kpi-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .kpi-card.green::before { background: var(--green); }
+    .kpi-card.blue::before { background: var(--blue); }
+    .kpi-card.yellow::before { background: var(--yellow); }
+    .kpi-card.red::before { background: var(--red); }
+    .kpi-card.purple::before { background: var(--purple); }
+    .kpi-label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px; }
+    .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
+    .kpi-sub { font-size: 12px; color: var(--text2); margin-top: 6px; }
+    .kpi-delta {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 600; padding: 2px 7px;
+      border-radius: 4px; margin-top: 6px;
+    }
+    .kpi-delta.up { background: rgba(0,184,148,0.15); color: var(--green); }
+    .kpi-delta.down { background: rgba(225,112,85,0.15); color: var(--red); }
+
+    /* ── CHART CARDS ── */
+    .chart-grid { display: grid; gap: 16px; margin-bottom: 24px; }
+    .chart-grid.col2 { grid-template-columns: 1fr 1fr; }
+    .chart-grid.col3 { grid-template-columns: 2fr 1fr; }
+    @media (max-width: 900px) {
+      .chart-grid.col2, .chart-grid.col3 { grid-template-columns: 1fr; }
+    }
+    .chart-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .chart-title {
+      font-size: 13px; font-weight: 700;
+      letter-spacing: 0.2px; margin-bottom: 4px;
+    }
+    .chart-sub { font-size: 11px; color: var(--text2); margin-bottom: 18px; }
+    .chart-wrap { position: relative; height: 220px; }
+    .chart-wrap.tall { height: 300px; }
+
+    /* ── TABLE ── */
+    .table-wrap { overflow-x: auto; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      background: var(--bg3); color: var(--text2);
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+      padding: 10px 14px; text-align: left; white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody td { padding: 10px 14px; color: var(--text); }
+    .td-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-green { background: rgba(0,184,148,0.15); color: var(--green); }
+    .badge-red { background: rgba(225,112,85,0.15); color: var(--red); }
+    .badge-yellow { background: rgba(253,203,110,0.15); color: var(--yellow); }
+    .badge-blue { background: rgba(116,185,255,0.15); color: var(--blue); }
+    .badge-purple { background: rgba(162,155,254,0.15); color: var(--purple); }
+
+    /* ── ALERT PANEL ── */
+    .alert-list { display: flex; flex-direction: column; gap: 10px; }
+    .alert-item {
+      background: var(--bg3); border-radius: 10px; padding: 14px 18px;
+      display: flex; align-items: flex-start; gap: 12px;
+      border-left: 3px solid transparent;
+    }
+    .alert-item.warn { border-left-color: var(--yellow); }
+    .alert-item.danger { border-left-color: var(--red); }
+    .alert-item.info { border-left-color: var(--blue); }
+    .alert-item.ok { border-left-color: var(--green); }
+    .alert-icon { font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+    .alert-text strong { display: block; font-size: 13px; margin-bottom: 2px; }
+    .alert-text p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+    /* ── PROGRESS BAR ── */
+    .prog-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .prog-label { display: flex; justify-content: space-between; font-size: 12px; }
+    .prog-label span:last-child { color: var(--text2); font-family: 'JetBrains Mono', monospace; }
+    .prog-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+
+    /* ── DISCOUNT METER ── */
+    .disc-meter {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
+      gap: 12px; margin-bottom: 24px;
+    }
+    .disc-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .disc-name { font-size: 11px; color: var(--text2); margin-bottom: 8px; font-weight: 600; letter-spacing: 0.5px; }
+    .disc-value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .disc-gauge { height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .disc-fill { height: 100%; border-radius: 2px; }
+
+    /* ── ORDER TIMELINE ── */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .tl-item {
+      display: grid; grid-template-columns: 90px 1fr;
+      gap: 16px; padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .tl-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text2); padding-top: 2px; }
+    .tl-content strong { font-size: 13px; display: block; margin-bottom: 2px; }
+    .tl-content span { font-size: 12px; color: var(--text2); }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 16px;
+    }
+    .section-header h3 { font-size: 14px; font-weight: 700; }
+    .section-header .line { flex: 1; height: 1px; background: var(--border); }
+
+    /* ── UTILS ── */
+    .mt8 { margin-top: 8px; }
+    .mt16 { margin-top: 16px; }
+    .mt24 { margin-top: 24px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .col { flex: 1; min-width: 220px; }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── FADE IN ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeUp 0.45s ease both; }
+    .delay1 { animation-delay: 0.05s; }
+    .delay2 { animation-delay: 0.10s; }
+    .delay3 { animation-delay: 0.15s; }
+    .delay4 { animation-delay: 0.20s; }
+    .delay5 { animation-delay: 0.25s; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ TOPBAR ══════════════ -->
+<header class="topbar">
+  <div class="topbar-logo">
+    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="28" height="28" rx="7" fill="#00b894" fill-opacity="0.15"/>
+      <path d="M7 21L7 14M11 21V10M15 21V13M19 21V7" stroke="#00b894" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <span>Cascos <span class="dot">Analytics</span></span>
+  </div>
+  <div class="topbar-right">
+    <span class="status-badge" id="status-badge">PRONTO</span>
+  </div>
+</header>
+
+<!-- ══════════════ UPLOAD SCREEN ══════════════ -->
+<div id="upload-screen">
+  <h1 class="upload-title">Dashboard <em>Vendite & Ordini</em></h1>
+  <p class="upload-subtitle">Carica i file Excel per generare l'analisi completa: fatturato, sconti, trasporti, criticità e ordini inevasi.</p>
+
+  <div class="upload-grid">
+    <label class="upload-card" id="card-vendite">
+      <input type="file" id="file-vendite" accept=".xlsx,.xls" />
+      <div class="upload-icon green">📊</div>
+      <div class="upload-card-label">Vendite</div>
+      <div class="upload-card-sub" id="vendite-name">XLSX — Spedizioni & Resi</div>
+      <div class="upload-card-check">✓</div>
+    </label>
+
+    <label class="upload-card" id="card-ordini">
+      <input type="file" id="file-ordini" accept=".xlsx,.xls" />
+      <div class="upload-icon blue">📋</div>
+      <div class="upload-card-label">Ordini</div>
+      <div class="upload-card-sub" id="ordini-name">XLSX — Ordini Clienti</div>
+      <div class="upload-card-check">✓</div>
+    </label>
+
+    <label class="upload-card" id="card-listino">
+      <input type="file" id="file-listino" accept=".csv,.xlsx,.xls" />
+      <div class="upload-icon yellow">💰</div>
+      <div class="upload-card-label">Listino Prezzi</div>
+      <div class="upload-card-sub" id="listino-name">CSV — Prezzi Lordi</div>
+      <div class="upload-card-check">✓</div>
+    </label>
+  </div>
+
+  <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis()">
+    ⚡ Analizza Dashboard
+  </button>
+  <p class="upload-note">I file vengono elaborati localmente nel browser — nessun dato inviato a server esterni.</p>
+</div>
+
+<!-- ══════════════ LOADING ══════════════ -->
+<div id="loading-screen" style="display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; position:fixed; inset:0; background:var(--bg); z-index:200;">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loading-msg">Elaborazione dati...</div>
+  <div class="loading-sub" id="loading-sub">Caricamento file in corso</div>
+</div>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div>
+      <div class="dash-title">Analisi <span>Cormach Srl</span> — Cascos</div>
+      <div class="dash-period" id="dash-period">Periodo: —</div>
+    </div>
+    <button class="btn-reset" onclick="resetApp()">↩ Nuovo Caricamento</button>
+  </div>
+
+  <nav class="nav-tabs">
+    <button class="tab-btn active" onclick="showTab('overview')">📈 Overview</button>
+    <button class="tab-btn" onclick="showTab('vendite')">💶 Vendite</button>
+    <button class="tab-btn" onclick="showTab('sconti')">🏷️ Sconti</button>
+    <button class="tab-btn" onclick="showTab('trasporti')">🚚 Trasporti</button>
+    <button class="tab-btn" onclick="showTab('ordini')">📋 Ordini</button>
+    <button class="tab-btn" onclick="showTab('criticita')">⚠️ Criticità</button>
+  </nav>
+
+  <!-- TAB: OVERVIEW -->
+  <div id="tab-overview" class="tab-panel active">
+    <div class="kpi-grid fade-in" id="kpi-overview"></div>
+    <div class="chart-grid col3 fade-in delay2">
+      <div class="chart-card">
+        <div class="chart-title">Fatturato Annuale</div>
+        <div class="chart-sub">Andamento storico vendite (causale V)</div>
+        <div class="chart-wrap tall"><canvas id="chart-annual"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Mix Categorie</div>
+        <div class="chart-sub">Fatturato per famiglia prodotto</div>
+        <div class="chart-wrap tall"><canvas id="chart-cat-pie"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-grid col2 fade-in delay3">
+      <div class="chart-card">
+        <div class="chart-title">Andamento 2025 vs 2024 — Mensile</div>
+        <div class="chart-sub">Confronto fatturato mese su mese</div>
+        <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top 10 Clienti 2024–2026</div>
+        <div class="chart-sub">Fatturato cumulativo</div>
+        <div class="chart-wrap"><canvas id="chart-top-cli"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: VENDITE -->
+  <div id="tab-vendite" class="tab-panel">
+    <div class="kpi-grid fade-in" id="kpi-vendite"></div>
+    <div class="chart-grid col2 fade-in delay1">
+      <div class="chart-card">
+        <div class="chart-title">Fatturato per Categoria</div>
+        <div class="chart-sub">Contributo al fatturato totale</div>
+        <div class="chart-wrap tall"><canvas id="chart-cat-bar"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Vendite per Agente</div>
+        <div class="chart-sub">Fatturato 2024–2026 per agente</div>
+        <div class="chart-wrap tall"><canvas id="chart-agent"></canvas></div>
+      </div>
+    </div>
+    <div class="fade-in delay2">
+      <div class="section-header mt16"><h3>Top Clienti 2024–2026</h3><div class="line"></div></div>
+      <div class="table-wrap"><table id="table-clienti"></table></div>
+    </div>
+  </div>
+
+  <!-- TAB: SCONTI -->
+  <div id="tab-sconti" class="tab-panel">
+    <div class="kpi-grid fade-in" id="kpi-sconti"></div>
+    <div class="disc-meter fade-in delay1" id="disc-meter"></div>
+    <div class="chart-grid col2 fade-in delay2">
+      <div class="chart-card">
+        <div class="chart-title">Sconto Medio Annuale</div>
+        <div class="chart-sub">Evoluzione dello sconto medio applicato (su articoli listino)</div>
+        <div class="chart-wrap"><canvas id="chart-disc-annual"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Distribuzione Sconti</div>
+        <div class="chart-sub">Frequenza per fascia sconto</div>
+        <div class="chart-wrap"><canvas id="chart-disc-dist"></canvas></div>
+      </div>
+    </div>
+    <div class="fade-in delay3">
+      <div class="section-header mt16">
+        <h3>⚠️ Vendite con Sconto &gt; 60% (Max Contrattuale)</h3>
+        <div class="line"></div>
+      </div>
+      <div class="table-wrap"><table id="table-over60"></table></div>
+    </div>
+  </div>
+
+  <!-- TAB: TRASPORTI -->
+  <div id="tab-trasporti" class="tab-panel">
+    <div class="kpi-grid fade-in" id="kpi-trasporti"></div>
+    <div class="chart-grid col2 fade-in delay1">
+      <div class="chart-card">
+        <div class="chart-title">Costo Trasporto & Incidenza %</div>
+        <div class="chart-sub">Spese di trasporto annuali e % sul fatturato</div>
+        <div class="chart-wrap"><canvas id="chart-transport"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Distribuzione Porto</div>
+        <div class="chart-sub">Tipologia porto nelle spedizioni</div>
+        <div class="chart-wrap"><canvas id="chart-porto"></canvas></div>
+      </div>
+    </div>
+    <div class="fade-in delay2">
+      <div class="section-header mt16"><h3>Analisi Trasporti per Anno</h3><div class="line"></div></div>
+      <div class="table-wrap"><table id="table-transport"></table></div>
+    </div>
+  </div>
+
+  <!-- TAB: ORDINI -->
+  <div id="tab-ordini" class="tab-panel">
+    <div class="kpi-grid fade-in" id="kpi-ordini"></div>
+    <div class="chart-grid col2 fade-in delay1">
+      <div class="chart-card">
+        <div class="chart-title">Ordini per Cliente</div>
+        <div class="chart-sub">Importo inevaso per cliente</div>
+        <div class="chart-wrap"><canvas id="chart-ordini-cli"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Scadenze Consegna</div>
+        <div class="chart-sub">Valore ordini per data consegna prevista</div>
+        <div class="chart-wrap"><canvas id="chart-ordini-date"></canvas></div>
+      </div>
+    </div>
+    <div class="fade-in delay2">
+      <div class="section-header mt16"><h3>Dettaglio Ordini Inevasi</h3><div class="line"></div></div>
+      <div class="table-wrap"><table id="table-ordini"></table></div>
+    </div>
+  </div>
+
+  <!-- TAB: CRITICITÀ -->
+  <div id="tab-criticita" class="tab-panel">
+    <div class="section-header fade-in"><h3>Criticità Rilevate</h3><div class="line"></div></div>
+    <div class="alert-list fade-in delay1" id="alert-list"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
