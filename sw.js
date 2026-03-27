@@ -1,4 +1,4 @@
-// Cascos Analytics — Service Worker
+// PezzaliApp — Cormach Dashboard Service Worker
 const CACHE = 'cascos-analytics-v1';
 const ASSETS = [
   './',

@@ -1,4 +1,4 @@
-# 📊 Cascos Analytics — PezzaliApp
+# 📊 PezzaliApp — Cormach Dashboard
 
 Dashboard professionale per l'analisi di **vendite**, **ordini** e KPI commerciali per **Cormach Srl** / Cascos.
 
@@ -34,7 +34,7 @@ Dashboard professionale per l'analisi di **vendite**, **ordini** e KPI commercia
 # 1. Crea il repository su GitHub: pezzaliapp_repo
 git init
 git add .
-git commit -m "Initial release — Cascos Analytics v1"
+git commit -m "Initial release — PezzaliApp v3"
 git remote add origin https://github.com/PezzaliStack/pezzaliapp_repo.git
 git push -u origin main
 
@@ -55,7 +55,7 @@ L'app sarà disponibile su: `https://pezzalistack.github.io/pezzaliapp_repo/`
 ## 📐 Design System PezzaliApp
 
 - Background: `#0d0d0d` / `#141414`
-- Accent: `#00b894` (verde Cascos)
+- Accent: `#00b894` (verde Cormach)
 - Font: Space Grotesk + JetBrains Mono
 - Compatibile con il design system pezzaliapp.com
 

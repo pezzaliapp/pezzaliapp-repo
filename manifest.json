@@ -1,7 +1,7 @@
 {
   "name": "PezzaliApp",
   "short_name": "PezzaliApp",
-  "description": "Dashboard professionale vendite, ordini e analisi sconti Cascos / Cormach Srl",
+  "description": "Dashboard professionale vendite, ordini e analisi per Cormach Srl",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0d0d0d",

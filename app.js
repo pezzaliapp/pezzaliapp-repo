@@ -150,7 +150,9 @@ function processData(vRaw, oRaw, lRaw) {
     const PORTO_LABELS={1:'Franco',2:'Assegnato',3:'Franco+Add.',6:'Altro',29:'Altro',168:'Altro'};
     const portoRaw=r[CV.porto];
     const porto_desc=PORTO_LABELS[portoRaw]||'Altro';
-    const sconto_eff = sconto!==null ? sconto : 0.60; // fallback 60% soglia max
+    const sconto_eff = sconto!==null ? sconto : 0.60;
+    const _cat = str(r[CV.cat]||'');
+    const _agente = str(r[CV.agente]||'');
     return {
       anno,date,mese,trim,importo,pz,qty:num(r[CV.qty]),trasp,
       cat: (_cat==='nan'||_cat===''||!isNaN(Number(_cat))) ? '' : _cat,
