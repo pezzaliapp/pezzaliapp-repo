@@ -1,6 +1,6 @@
 {
-  "name": "Cascos Analytics — PezzaliApp",
-  "short_name": "Cascos Analytics",
+  "name": "PezzaliApp",
+  "short_name": "PezzaliApp",
   "description": "Dashboard professionale vendite, ordini e analisi sconti Cascos / Cormach Srl",
   "start_url": "./index.html",
   "display": "standalone",

@@ -1,8 +1,13 @@
 // ══════════════════════════════════════════════════════
-//  Cascos Analytics v2 — PezzaliApp
+//  PezzaliApp v2
 //  Engine completo: filtri, drill-down, confronto, sconti
 // ══════════════════════════════════════════════════════
 'use strict';
+
+// Riconoscimento brand Cascos via DESCRIZIONE (Cormach usa codici interni diversi da Cascos factory ref)
+// Pattern costruito dall'incrocio tra listino Cascos 2026 e descrizioni nelle vendite
+const CASCOS_PATTERN = /\bC\s*3[.,]2|\bC\s*3[.,]5|\bC\s*4\s*(XL|s|S|\b)|\bC\s*5\s*(XL|s|S|[.,]5|\b)|\bC\s*5[.,]5|\bC\s*7s\b|\bC\s*4[3-9]\d\b|\bC\s*4\d{2}\b|\bC\s*125\b|\bPARKING\s*2x1\b/i;
+const CASCOS_EXCLUDE = /PFA\s*\d+|STD\s*72|FORBICE|SCHEDA|CENTRALINA|POMPA|MICRO\s*FIN|FOTOCELLULA|PERNO|BRACCIO\s*(SX|DX)|USATO|CARTER|TASTATORE/i;
 
 const SCONTO_MAX = 0.60;
 const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
@@ -136,6 +141,8 @@ function processData(vRaw, oRaw, lRaw) {
     .map(r => {
       const cod = str(r[CV.articolo]).replace(/^0+/,'');
       const li = listinoMap[cod] || null;
+      const _d = str(r[CV.desc]);
+      const brand = (CASCOS_PATTERN.test(_d) && !CASCOS_EXCLUDE.test(_d)) ? 'Cascos' : (li ? 'Cormach' : '__no');
       const pz = num(r[CV.pz]);
       const importo = num(r[CV.importo]);
       const trasp = num(r[CV.trasp]);
@@ -151,7 +158,7 @@ function processData(vRaw, oRaw, lRaw) {
       return {
         anno, date, mese, trim,
         importo, pz, qty: num(r[CV.qty]), trasp,
-        cat: str(r[CV.cat]), agente: str(r[CV.agente]),
+        cat: str(r[CV.cat]), agente: str(r[CV.agente]), brand,
         cliente: str(r[CV.cliente]),
         articolo: str(r[CV.articolo]), desc: str(r[CV.desc]),
         porto: r[CV.porto], lordo, sconto,
@@ -228,6 +235,7 @@ function applyFilters() {
   const annoA  = parseInt(document.getElementById('f-a').value) || 9999;
   const perVal = document.getElementById('f-per').value;
   const agente = document.getElementById('f-agt').value;
+  const brandF = (document.getElementById('f-brand')||{}).value||'';
 
   // resolve mesi
   let mesiOk = null;
@@ -242,6 +250,10 @@ function applyFilters() {
     if (r.anno < annoDa || r.anno > annoA) return false;
     if (mesiOk && !mesiOk.includes(r.mese)) return false;
     if (agente && r.agente !== agente) return false;
+    if (brandF) {
+      if (brandF === '__no' && r.brand !== '__no') return false;
+      if (brandF !== '__no' && r.brand.toLowerCase() !== brandF.toLowerCase()) return false;
+    }
     return true;
   });
 
@@ -252,6 +264,10 @@ function applyFilters() {
       if (r.anno !== cmpAnno) return false;
       if (mesiOk && !mesiOk.includes(r.mese)) return false;
       if (agente && r.agente !== agente) return false;
+      if (brandF) {
+        if (brandF === '__no' && r.brand !== '__no') return false;
+        if (brandF !== '__no' && r.brand.toLowerCase() !== brandF.toLowerCase()) return false;
+      }
       return true;
     });
   } else F.vendCmp = null;
@@ -263,6 +279,8 @@ function applyFilters() {
     else if (perVal.startsWith('m')) plabel += ` ${MESI[parseInt(perVal.slice(1))-1]}`;
   }
   if (agente) plabel += ` · ${agente}`;
+  if (brandF && brandF !== '__no') plabel += ` · ${brandF}`;
+  if (brandF === '__no') plabel += ` · Senza listino`;
   F.label = plabel;
   document.getElementById('sb-period').textContent = plabel;
 

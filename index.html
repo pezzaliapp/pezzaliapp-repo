@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Cascos Analytics v2 — PezzaliApp</title>
+<title>PezzaliApp</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#080d1a"/>
 <link rel="icon" href="icon.svg"/>
@@ -238,7 +238,7 @@ tbody td{padding:7px 10px;vertical-align:middle}
   <div class="topbar-brand">
     <svg viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#00e5a0" fill-opacity=".12"/>
     <path d="M4 18V12M8 18V7M12 18V10M16 18V4M20 18V8" stroke="#00e5a0" stroke-width="1.8" stroke-linecap="round"/></svg>
-    <div class="brand-name">Cascos <em>Analytics</em></div>
+    <div class="brand-name"><em>PezzaliApp</em></div>
   </div>
 
   <div class="topbar-filters" id="top-filters" hidden>
@@ -263,6 +263,14 @@ tbody td{padding:7px 10px;vertical-align:middle}
     <div class="fsep"></div>
     <span class="fl">Agente</span>
     <select id="f-agt" onchange="applyFilters()"><option value="">Tutti</option></select>
+    <div class="fsep"></div>
+    <span class="fl">Brand</span>
+    <select id="f-brand" onchange="applyFilters()">
+      <option value="">Tutti</option>
+      <option value="Cormach">Cormach</option>
+      <option value="Cascos">Cascos</option>
+      <option value="__no">Senza listino</option>
+    </select>
   </div>
 
   <div class="topbar-right">
@@ -290,7 +298,7 @@ tbody td{padding:7px 10px;vertical-align:middle}
   <div class="ni" onclick="go('ordini')"><span class="ic">📋</span>Ordini Inevasi</div>
   <div class="sb-sec">Alert</div>
   <div class="ni" onclick="go('criticita')"><span class="ic">⚠️</span>Criticità<span class="nbadge" id="nbadge">—</span></div>
-  <div class="sb-foot">PezzaliApp · Cormach Srl<br>Cascos Analytics v2.0<br>© 2026</div>
+  <div class="sb-foot">PezzaliApp<br>Cormach Srl · v2.0<br>© 2026</div>
 </nav>
 
 <!-- MAIN -->
@@ -298,7 +306,7 @@ tbody td{padding:7px 10px;vertical-align:middle}
 
 <!-- UPLOAD -->
 <div id="upload-screen">
-  <h1 class="uph">Dashboard <em>Vendite Cascos</em></h1>
+  <h1 class="uph"><em>PezzaliApp</em></h1>
   <p class="ups">Cruscotto professionale con analisi sconti per macchina, erosione margine, ranking agenti, confronto periodi e ordini inevasi.</p>
   <div class="upg">
     <label class="upc" id="uc-v"><input type="file" id="fi-v" accept=".xlsx,.xls"/>
