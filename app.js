@@ -122,7 +122,7 @@ function processData(vRaw, oRaw, lRaw) {
     trasp: col(['SPESE DI TRASPORTO','TRASPORTO']),
     causale: col(['CAUSALE MAGAZZINO','CAUSALE']),
     cat:   col(['DESCRIZIONE ELEMENTO.5','CATEGORIA']),
-    agente: col(['DESCRIZIONE ELEMENTO.2','AGENTE']),
+    agente: col(['DESCRIZIONE ELEMENTO.2','DESCRIZIONE ELEMENTO.6']),
     cliente: col(['RAGIONE SOCIALE 1','RAGIONE SOCIALE','CLIENTE']),
     dest:  col(['DESC. DESTINAZIONE 1','DESTINAZIONE']),
     articolo: col(['ARTICOLO']),
@@ -311,7 +311,7 @@ function renderOverview(){
   });
 
   // pie
-  const catFatt=groupBy(V.filter(r=>r.cat),r=>r.cat,rows=>sum(rows,r=>r.importo));
+  const catFatt=groupBy(V.filter(r=>r.cat&&r.cat!=='nan'&&r.cat.length>1),r=>r.cat,rows=>sum(rows,r=>r.importo));
   const catS=Object.entries(catFatt).sort((a,b)=>b[1]-a[1]).slice(0,8);
   doPie('ch-pie',catS.map(([k])=>k.split(' - ')[0]),catS.map(([,v])=>v));
 
@@ -394,7 +394,7 @@ function renderTrend(){
 // ── VENDITE ──
 function renderVendite(){
   const V=F.vend, C=tc();
-  const catFatt=groupBy(V.filter(r=>r.cat),r=>r.cat,rows=>({f:sum(rows,r=>r.importo),q:sum(rows,r=>r.qty),n:rows.length,sc:avg(rows.filter(r=>r.sconto!==null),r=>r.sconto)}));
+  const catFatt=groupBy(V.filter(r=>r.cat&&r.cat!=='nan'&&r.cat.length>1),r=>r.cat,rows=>({f:sum(rows,r=>r.importo),q:sum(rows,r=>r.qty),n:rows.length,sc:avg(rows.filter(r=>r.sconto!==null),r=>r.sconto)}));
   const cats=Object.entries(catFatt).sort((a,b)=>b[1].f-a[1].f);
   const totF=sum(V,r=>r.importo);
 
@@ -606,8 +606,14 @@ function renderScontiTbl(){
 // ── MARGINE ──
 function renderMargine(){
   const V=F.vend, C=tc();
-  const catMarg=groupBy(V.filter(r=>r.cat&&r.sconto!==null),r=>r.cat,rows=>({sc:avg(rows,r=>r.sconto),tr:avg(rows,r=>r.incTrasp),f:sum(rows,r=>r.importo),n:rows.length}));
-  const sorted=Object.entries(catMarg).map(([k,v])=>[k,{...v,erosione:v.sc+v.tr}]).filter(([k])=>k).sort((a,b)=>b[1].erosione-a[1].erosione);
+  // Marginalità: include TUTTE le categorie, sc=null per categorie senza listino
+  const catMarg=groupBy(V.filter(r=>r.cat&&r.cat!=='nan'&&r.cat.length>1),r=>r.cat,rows=>({
+    sc: rows.filter(r=>r.sconto!==null).length>0 ? avg(rows.filter(r=>r.sconto!==null),r=>r.sconto) : null,
+    tr: avg(rows,r=>r.incTrasp),
+    f: sum(rows,r=>r.importo),
+    n: rows.length
+  }));
+  const sorted=Object.entries(catMarg).map(([k,v])=>[k,{...v,erosione:(v.sc||0)+v.tr}]).filter(([k])=>k&&k!=='nan').sort((a,b)=>b[1].f-a[1].f);
 
   const hmEl=document.getElementById('hm-margine'); hmEl.innerHTML='';
   sorted.forEach(([k,v])=>{
@@ -616,12 +622,12 @@ function renderMargine(){
       <div class="hmc">
         <div class="hmn">${trunc(k.split(' - ')[0],22)}</div>
         <div class="hmv" style="color:${col}">${pct(v.erosione)}</div>
-        <div class="hms">Sc ${pct(v.sc)} + Tr ${pct(v.tr)}</div>
+        <div class="hms">${v.sc!==null?'Sc '+pct(v.sc)+' + ':'Tr solo: '}${v.sc!==null?'Tr '+pct(v.tr):pct(v.tr)}</div>
         <div class="hmbar"><div class="hmfill" style="width:${Math.min(100,v.erosione*100)}%;background:${col}"></div></div>
       </div>`);
   });
 
-  const erosColors=sorted.map(([,v])=>v.erosione>0.8?C.red+'bb':v.erosione>0.65?C.amber+'bb':C.green+'88');
+  const erosColors=sorted.map(([,v])=>v.erosione>0.8?C.red+'bb':v.erosione>0.65?C.amber+'bb':v.sc===null?C.blue+'88':C.green+'88');
   doHBar('ch-eros',sorted.map(([k])=>trunc(k.split(' - ')[0],20)),sorted.map(([,v])=>v.erosione*100),null,erosColors);
 
   // scatter with size proportional to fatturato
@@ -630,7 +636,7 @@ function renderMargine(){
   const ctx=document.getElementById('ch-scatter').getContext('2d');
   charts['ch-scatter']=new Chart(ctx,{type:'bubble',
     data:{datasets:[{
-      data:sorted.map(([,v])=>({x:v.sc*100,y:v.tr*100,r:Math.max(4,Math.min(20,v.f/maxF*18))})),
+      data:sorted.map(([,v])=>({x:(v.sc||0)*100,y:v.tr*100,r:Math.max(4,Math.min(20,v.f/maxF*18))})),
       backgroundColor:sorted.map(([,v])=>v.erosione>0.8?C.red+'bb':v.erosione>0.65?C.amber+'bb':C.green+'88'),
       borderColor:'transparent'
     }]},
@@ -646,7 +652,7 @@ function renderMargine(){
   });
 
   tbl('tbl-marg',['Categoria','Erosione Totale','Sconto %','Trasp %','Fatturato','N°'],
-    sorted.map(([k,v])=>[trunc(k,30),`<span class="bdg ${v.erosione>0.8?'br':v.erosione>0.65?'ba':'bg'}">${pct(v.erosione)}</span>`,`<span class="mono">${pct(v.sc)}</span>`,`<span class="mono">${pct(v.tr)}</span>`,`<span class="mono">${fmt(v.f)}</span>`,v.n]));
+    sorted.map(([k,v])=>[trunc(k,30),`<span class="bdg ${v.erosione>0.8?'br':v.erosione>0.65?'ba':'bg'}">${pct(v.erosione)}</span>`,v.sc!==null?`<span class="mono">${pct(v.sc)}</span>`:'<span class="mono" style="color:var(--text3)">N/D</span>',`<span class="mono">${pct(v.tr)}</span>`,`<span class="mono">${fmt(v.f)}</span>`,v.n]));
 }
 
 // ── TRASPORTI ──
