@@ -115,22 +115,25 @@ function processData(vRaw, oRaw, lRaw) {
   const keys = Object.keys(vRaw[0]||{});
   const col = cs => cs.find(c=>keys.includes(c))||cs[0];
   const CV = {
-    anno:  col(['ANNO SPEDIZIONE','ANNO']),
-    data:  col(['DATA SPEDIZIONE','DATA']),
+    anno:    col(['ANNO SPEDIZIONE','ANNO']),
+    data:    col(['DATA SPEDIZIONE','DATA']),
     importo: col(['IMPORTO CONSEGNATO','IMPORTO']),
-    pz:    col(['PZ NETTO VENDITA','PZ NETTO']),
-    qty:   col(['QTA CONSEGNATA','QTA']),
-    trasp: col(['SPESE DI TRASPORTO','TRASPORTO']),
+    pz:      col(['PZ NETTO VENDITA','PZ NETTO']),
+    qty:     col(['QTA CONSEGNATA','QTA']),
+    trasp:   col(['SPESE DI TRASPORTO','TRASPORTO']),
     causale: col(['CAUSALE MAGAZZINO','CAUSALE']),
-    cat:   col(['DESCRIZIONE ELEMENTO.5','CATEGORIA']),
-    agente: col(['DESCRIZIONE ELEMENTO.2','DESCRIZIONE ELEMENTO.6']),
+    cat:     col(['DESCRIZIONE ELEMENTO.5','CATEGORIA']),
+    sottocat:col(['DESCRIZIONE ELEMENTO.4','SOTTOCATEGORIA']),
+    agente:  col(['DESCRIZIONE ELEMENTO.2','DESCRIZIONE ELEMENTO.6']),
     cliente: col(['RAGIONE SOCIALE 1','RAGIONE SOCIALE','CLIENTE']),
-    dest:  col(['DESC. DESTINAZIONE 1','DESTINAZIONE']),
-    articolo: col(['ARTICOLO']),
-    desc:  col(['DESCRIZIONE']),
-    porto: col(['PORTO']),
-    zona:  col(['ZONA']),
+    dest:    col(['DESC. DESTINAZIONE 1','DESTINAZIONE']),
+    articolo:col(['ARTICOLO']),
+    desc:    col(['DESCRIZIONE']),
+    porto:   col(['PORTO']),
+    zona:    col(['ZONA']),
     nazione: col(['NAZIONE']),
+    regione: col(['DESCRIZIONE ELEMENTO.3','REGIONE']),
+    citta:   col(['DESCRIZIONE ELEMENTO.1','CITTA']),
   };
 
   const VEND = vRaw.filter(r => str(r[CV.causale]).toUpperCase().startsWith('V')).map(r => {
@@ -144,13 +147,21 @@ function processData(vRaw, oRaw, lRaw) {
     const brand = (CASCOS_PATTERN.test(desc)&&!CASCOS_EXCLUDE.test(desc)) ? 'Cascos' : (li?'Cormach':'__no');
     let date=null,mese=-1,trim=-1;
     try{ const d=r[CV.data]; date=d instanceof Date?d:new Date(d); if(!isNaN(date)){mese=date.getMonth();trim=Math.floor(mese/3);} }catch(e){}
+    const PORTO_LABELS={1:'Franco',2:'Assegnato',3:'Franco+Add.',6:'Altro',29:'Altro',168:'Altro'};
+    const portoRaw=r[CV.porto];
+    const porto_desc=PORTO_LABELS[portoRaw]||'Altro';
+    const sconto_eff = sconto!==null ? sconto : 0.60; // fallback 60% soglia max
     return {
       anno,date,mese,trim,importo,pz,qty:num(r[CV.qty]),trasp,
-      cat:str(r[CV.cat]),agente:str(r[CV.agente]),
+      cat: (_cat==='nan'||_cat===''||!isNaN(Number(_cat))) ? '' : _cat,
+      sottocat:str(r[CV.sottocat]||''),
+      agente: (_agente===''||_agente==='nan'||!isNaN(Number(_agente))) ? '' : _agente,
       cliente:str(r[CV.cliente]),dest:str(r[CV.dest]),
       nazione:str(r[CV.nazione]),
-      articolo:str(r[CV.articolo]),desc,lordo,sconto,brand,
+      regione:str(r[CV.regione]),citta:str(r[CV.citta]),
+      articolo:str(r[CV.articolo]),desc,lordo,sconto,sconto_eff,brand,
       incTrasp:importo>0?trasp/importo:0,
+      porto_desc,
     };
   }).filter(r=>r.anno>2000);
 
@@ -607,14 +618,17 @@ function renderScontiTbl(){
 // ── MARGINE ──
 function renderMargine(){
   const V=F.vend, C=tc();
-  // Marginalità: include TUTTE le categorie, sc=null per categorie senza listino
+  // Marginalità: include TUTTE le categorie
+  // sc_real = sconto reale da listino se disponibile, null altrimenti
+  // sc_eff  = sconto reale O 60% (soglia contrattuale) come fallback
   const catMarg=groupBy(V.filter(r=>r.cat&&r.cat!=='nan'&&r.cat.length>1),r=>r.cat,rows=>({
-    sc: rows.filter(r=>r.sconto!==null).length>0 ? avg(rows.filter(r=>r.sconto!==null),r=>r.sconto) : null,
-    tr: avg(rows,r=>r.incTrasp),
-    f: sum(rows,r=>r.importo),
-    n: rows.length
+    sc:     rows.filter(r=>r.sconto!==null).length>0 ? avg(rows.filter(r=>r.sconto!==null),r=>r.sconto) : null,
+    sc_eff: avg(rows,r=>r.sconto_eff),
+    tr:     avg(rows,r=>r.incTrasp),
+    f:      sum(rows,r=>r.importo),
+    n:      rows.length
   }));
-  const sorted=Object.entries(catMarg).map(([k,v])=>[k,{...v,erosione:(v.sc||0)+v.tr}]).filter(([k])=>k&&k!=='nan').sort((a,b)=>b[1].f-a[1].f);
+  const sorted=Object.entries(catMarg).map(([k,v])=>[k,{...v,erosione:v.sc_eff+v.tr}]).filter(([k])=>k&&k!=='nan').sort((a,b)=>b[1].f-a[1].f);
 
   const hmEl=document.getElementById('hm-margine'); hmEl.innerHTML='';
   sorted.forEach(([k,v])=>{
@@ -637,7 +651,7 @@ function renderMargine(){
   const ctx=document.getElementById('ch-scatter').getContext('2d');
   charts['ch-scatter']=new Chart(ctx,{type:'bubble',
     data:{datasets:[{
-      data:sorted.map(([,v])=>({x:(v.sc||0)*100,y:v.tr*100,r:Math.max(4,Math.min(20,v.f/maxF*18))})),
+      data:sorted.map(([,v])=>({x:v.sc_eff*100,y:v.tr*100,r:Math.max(4,Math.min(20,v.f/maxF*18))})),
       backgroundColor:sorted.map(([,v])=>v.erosione>0.8?C.red+'bb':v.erosione>0.65?C.amber+'bb':C.green+'88'),
       borderColor:'transparent'
     }]},
@@ -652,8 +666,8 @@ function renderMargine(){
     }
   });
 
-  tbl('tbl-marg',['Categoria','Erosione Totale','Sconto %','Trasp %','Fatturato','N°'],
-    sorted.map(([k,v])=>[trunc(k,30),`<span class="bdg ${v.erosione>0.8?'br':v.erosione>0.65?'ba':'bg'}">${pct(v.erosione)}</span>`,v.sc!==null?`<span class="mono">${pct(v.sc)}</span>`:'<span class="mono" style="color:var(--text3)">N/D</span>',`<span class="mono">${pct(v.tr)}</span>`,`<span class="mono">${fmt(v.f)}</span>`,v.n]));
+  tbl('tbl-marg',['Categoria','Erosione Totale','Sc. Reale','Sc. Usato','Trasp %','Fatturato','N°'],
+    sorted.map(([k,v])=>[trunc(k,30),`<span class="bdg ${v.erosione>0.8?'br':v.erosione>0.65?'ba':'bg'}">${pct(v.erosione)}</span>`,v.sc!==null?`<span class="mono">${pct(v.sc)}</span>`:'<span class="ba bdg" title="Stima: soglia max 60%">~60%</span>',`<span class="mono">${pct(v.sc_eff)}</span>`,`<span class="mono">${pct(v.tr)}</span>`,`<span class="mono">${fmt(v.f)}</span>`,v.n]));
 }
 
 // ── TRASPORTI ──
@@ -701,7 +715,7 @@ function renderTrasporti(){
   });
 
   const portD={};
-  V.forEach(r=>{const p=PORTO_MAP[r.porto]||`Porto ${r.porto}`;portD[p]=(portD[p]||0)+1;});
+  V.forEach(r=>{const p=r.porto_desc||'Altro';portD[p]=(portD[p]||0)+1;});
   doPie('ch-porto',Object.keys(portD),Object.values(portD));
 
   tbl('tbl-tr',['Anno','Fatturato','Trasporto','Incidenza','Δ'],
@@ -711,6 +725,32 @@ function renderTrasporti(){
         `<span class="bdg ${inc[i]>0.05?'br':'bg'}">${pct(inc[i])}</span>`,
         dlt!==null?`<span class="bdg ${dlt>0?'br':'bg'}">${dlt>0?'+':''}${pct(dlt)}</span>`:'—'];
     }));
+
+  // ── Trasporti per Regione
+  const trReg=groupBy(V.filter(r=>r.regione&&r.regione!=='nan'),r=>r.regione,rows=>({f:sum(rows,r=>r.importo),tr:sum(rows,r=>r.trasp)}));
+  const regSorted=Object.entries(trReg).map(([k,v])=>({k,f:v.f,tr:v.tr,inc:v.f>0?v.tr/v.f:0})).sort((a,b)=>b.tr-a.tr);
+  dc('ch-tr-reg');
+  const ctxReg=document.getElementById('ch-tr-reg');
+  if(ctxReg){
+    charts['ch-tr-reg']=new Chart(ctxReg.getContext('2d'),{type:'bar',
+      data:{labels:regSorted.map(r=>r.k),datasets:[
+        {label:'Trasporto €',data:regSorted.map(r=>r.tr),backgroundColor:regSorted.map(r=>r.inc>0.08?C.red+'aa':r.inc>0.05?C.amber+'aa':C.purple+'88'),borderRadius:3}
+      ]},
+      options:{...chartOpts({callbackY:v=>fmtShort(v),C}),indexAxis:'y'}
+    });
+  }
+
+  // ── Trasporti per Agente
+  const trAgt=groupBy(V.filter(r=>r.agente&&r.agente!=='nan'),r=>r.agente,rows=>({f:sum(rows,r=>r.importo),tr:sum(rows,r=>r.trasp)}));
+  const agtTrSorted=Object.entries(trAgt).map(([k,v])=>({k,f:v.f,tr:v.tr,inc:v.f>0?v.tr/v.f:0})).sort((a,b)=>b.tr-a.tr);
+
+  tbl('tbl-tr-reg',['Regione','Fatturato','Trasporto','Incidenza'],
+    regSorted.slice(0,20).map(r=>[r.k,`<span class="mono">${fmt(r.f)}</span>`,`<span class="mono">${fmt(r.tr)}</span>`,
+      `<span class="bdg ${r.inc>0.08?'br':r.inc>0.05?'ba':'bg'}">${pct(r.inc)}</span>`]));
+
+  tbl('tbl-tr-agt',['Agente','Fatturato','Trasporto','Incidenza'],
+    agtTrSorted.map(r=>[r.k,`<span class="mono">${fmt(r.f)}</span>`,`<span class="mono">${fmt(r.tr)}</span>`,
+      `<span class="bdg ${r.inc>0.06?'br':r.inc>0.04?'ba':'bg'}">${pct(r.inc)}</span>`]));
 }
 
 // ── ORDINI ──
@@ -876,7 +916,7 @@ function tbl(id,headers,rows){
 function sortTbl(id,col){
   const s=sortState[id]||{col:-1,asc:true};
   sortState[id]={col,asc:s.col===col?!s.asc:true};
-  const map={'tbl-cat':'vendite','tbl-drill':'vendite','tbl-cli':'clienti','tbl-sc':'sconti','tbl-over60-cli':'sconti','tbl-marg':'margine','tbl-tr':'trasporti','tbl-ord':'ordini'};
+  const map={'tbl-cat':'vendite','tbl-drill':'vendite','tbl-cli':'clienti','tbl-sc':'sconti','tbl-over60-cli':'sconti','tbl-marg':'margine','tbl-tr':'trasporti','tbl-tr-reg':'trasporti','tbl-tr-agt':'trasporti','tbl-ord':'ordini'};
   if(map[id]==='vendite')renderVendite();
   else if(map[id]==='clienti')filterCliTbl();
   else if(map[id]==='sconti')renderScontiTbl();
