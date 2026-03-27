@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)"/>
+<meta name="theme-color" content="#f1f5f9" media="(prefers-color-scheme: light)"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="PezzaliApp"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
 <title>PezzaliApp — Cormach Dashboard</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="icon" href="icon.svg"/>
@@ -371,6 +377,94 @@ tbody td{padding:7px 10px;vertical-align:middle;color:var(--text)}
 [hidden]{display:none!important}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+  /* ── MOBILE: sidebar come hamburger sotto 768px ── */
+  @media(max-width:768px){
+    body{grid-template-columns:1fr;grid-template-rows:var(--th) auto 1fr}
+    .sidebar{
+      grid-row:2;grid-column:1;
+      flex-direction:row;overflow-x:auto;overflow-y:hidden;
+      border-right:none;border-bottom:1px solid var(--border);
+      height:auto;max-height:none;
+    }
+    .sb-period{display:none}
+    .sb-sec{display:none}
+    .sb-foot{display:none}
+    .ni{padding:8px 12px;border-left:none;border-bottom:2px solid transparent;white-space:nowrap;font-size:10px}
+    .ni.on{border-left:none;border-bottom-color:var(--green)}
+    .ni .ic{font-size:11px}
+    .main{grid-row:3;grid-column:1}
+    .tb-filters{display:none}
+    .tb-brand{width:auto;border-right:none}
+    .panel{padding:12px}
+    .kr{grid-template-columns:repeat(2,1fr)}
+    .cg.c21,.cg.c12{grid-template-columns:1fr}
+  }
+  @media(max-width:480px){
+    .kr{grid-template-columns:1fr 1fr}
+    .kv{font-size:18px}
+  }
+
+  /* ── STAMPA ── */
+  @media print{
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    body{
+      display:block!important;
+      background:#fff!important;
+      color:#000!important;
+      font-size:10pt;
+    }
+    .topbar,.sidebar{display:none!important}
+    .main{
+      display:block!important;overflow:visible!important;
+      height:auto!important;width:100%!important;
+    }
+    .panel{display:none!important;padding:0}
+    .panel.on{display:block!important}
+    .panel.on .ptitle{font-size:14pt;font-weight:700;margin-bottom:4pt;color:#000}
+    .panel.on .psub{font-size:8pt;color:#555;margin-bottom:12pt}
+    .cc{
+      border:1px solid #ccc!important;border-radius:4pt!important;
+      padding:10pt!important;margin-bottom:10pt!important;
+      background:#fff!important;break-inside:avoid;
+    }
+    .kk{
+      border:1px solid #ccc!important;background:#f9f9f9!important;
+      color:#000!important;break-inside:avoid;
+    }
+    .kk-bar{background:#059669!important}
+    .kk-bar.r{background:#dc2626!important}
+    .kk-bar.a{background:#d97706!important}
+    .kk-bar.b{background:#2563eb!important}
+    .kv{color:#000!important;font-size:16pt!important}
+    .kv.g{color:#059669!important}
+    .kv.r{color:#dc2626!important}
+    .kv.a{color:#d97706!important}
+    .kv.b{color:#2563eb!important}
+    .kr{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:6pt!important;margin-bottom:10pt!important}
+    .cg{display:grid!important;gap:8pt!important;margin-bottom:8pt!important}
+    .cg.c2{grid-template-columns:1fr 1fr!important}
+    .cg.c21{grid-template-columns:2fr 1fr!important}
+    .cg.c1{grid-template-columns:1fr!important}
+    .cw{height:180pt!important}
+    .al{border:1px solid #ccc!important;background:#f9f9f9!important;color:#000!important}
+    .al strong{color:#000!important}
+    .al p{color:#444!important}
+    .al.danger{border-left:3pt solid #dc2626!important}
+    .al.warn{border-left:3pt solid #d97706!important}
+    .al.ok{border-left:3pt solid #059669!important}
+    .al.info{border-left:3pt solid #2563eb!important}
+    table{font-size:7pt!important}
+    thead th{background:#f0f0f0!important;color:#333!important;border-bottom:1pt solid #999!important}
+    tbody td{color:#000!important;border-bottom:0.5pt solid #eee!important}
+    .bdg{border:1pt solid #999!important;background:#f0f0f0!important;color:#000!important}
+    .hm{grid-template-columns:repeat(4,1fr)!important}
+    .hmc{border:1pt solid #ccc!important;background:#f9f9f9!important}
+    .hmv{color:#000!important;font-size:14pt!important}
+    .drill-cc,.sw2{display:none!important}
+    a[href]:after{content:none!important}
+    @page{margin:1.5cm;size:A4 landscape}
+  }
 </style>
 </head>
 <body>
@@ -419,6 +513,7 @@ tbody td{padding:7px 10px;vertical-align:middle;color:var(--text)}
     <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">🌙 Dark</button>
     <span class="pill pill-g" id="status-pill">PRONTO</span>
     <button class="bsm" id="btn-reset" onclick="resetApp()" hidden>↩ Reset</button>
+    <button class="bsm" id="btn-print" onclick="window.print()" hidden title="Stampa pannello corrente">🖨️</button>
   </div>
 </header>
 

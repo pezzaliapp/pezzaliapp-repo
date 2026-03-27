@@ -81,6 +81,7 @@ async function runAnalysis() {
     document.getElementById('upload-screen').style.display = 'none';
     document.getElementById('top-filters').removeAttribute('hidden');
     document.getElementById('btn-reset').removeAttribute('hidden');
+    document.getElementById('btn-print').removeAttribute('hidden');
     document.getElementById('status-pill').textContent = 'ATTIVO';
   } catch(err) {
     hideLoad(); alert('Errore: ' + err.message); console.error(err);
