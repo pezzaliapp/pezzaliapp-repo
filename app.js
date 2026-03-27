@@ -83,7 +83,21 @@ function readXLSX(id){
   return new Promise((res,rej)=>{
     const f=document.getElementById(id).files[0]; if(!f)return rej(new Error('File mancante'));
     const r=new FileReader();
-    r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}));}catch(e){rej(e);}};
+    r.onload=e=>{try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      // Leggi con header:1 per usare lettere colonna (A,B,C...) invece di nomi duplicati
+      const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rawRows.length<2){res([]);return;}
+      // Costruisci oggetti con chiavi = lettera colonna (A,B,C..AA,AB...)
+      const toKey=i=>i<26?String.fromCharCode(65+i):String.fromCharCode(64+Math.floor(i/26))+String.fromCharCode(65+(i%26));
+      const rows=rawRows.slice(1).map(row=>{
+        const obj={};
+        row.forEach((v,i)=>{obj[toKey(i)]=v;});
+        return obj;
+      });
+      res(rows);
+    }catch(e){rej(e);}};
     r.onerror=()=>rej(new Error('Lettura fallita'));r.readAsArrayBuffer(f);
   });
 }
@@ -100,39 +114,31 @@ function processData(vRaw,oRaw,lRaw){
     if(cod&&pl>0) listinoMap[cod]={pl,inst:num(r.CostoInstallazione||0),trasp:num(r.CostoTrasporto||0)};
   });
 
-  const keys=Object.keys(vRaw[0]||{});
-  const col=cs=>cs.find(c=>keys.includes(c))||cs[0];
-
-  // Mappa ESATTA colonne come da file Excel Cormach
+  // MAPPATURA PER LETTERA COLONNA (file Excel ha "DESCRIZIONE ELEMENTO" duplicato)
+  // SheetJS con header:1 usa lettere A,B,C... come chiavi
+  // Vendite Excel: V=cat, W=desc macchina, M=agente, O=regione, S=sottocat, J=città
   const CV={
-    anno:    col(['ANNO SPEDIZIONE','ANNO']),
-    data:    col(['DATA SPEDIZIONE','DATA']),
-    importo: col(['IMPORTO CONSEGNATO','IMPORTO']),
-    pz:      col(['PZ NETTO VENDITA','PZ NETTO']),
-    qty:     col(['QTA CONSEGNATA','QTA']),
-    trasp:   col(['SPESE DI TRASPORTO','TRASPORTO']),
-    causale: col(['CAUSALE MAGAZZINO','CAUSALE']),
-    // col V = categoria (Smontagomme, Equilibratrici ecc)
-    cat:     col(['DESCRIZIONE ELEMENTO.5']),
-    // col S = linea prodotto (F 536GT, MEC 10 ecc)
-    sottocat:col(['DESCRIZIONE ELEMENTO.4']),
-    // col M = agente (CABASSI, PEZZALI ecc)
-    agente:  col(['DESCRIZIONE ELEMENTO.2']),
-    cliente: col(['RAGIONE SOCIALE 1','RAGIONE SOCIALE','CLIENTE']),
-    dest:    col(['DESC. DESTINAZIONE 1','DESTINAZIONE']),
-    articolo:col(['ARTICOLO']),
-    // col W = descrizione specifica macchina
-    desc:    col(['DESCRIZIONE']),
-    porto:   col(['PORTO']),
-    nazione: col(['NAZIONE']),
-    // col O = regione
-    regione: col(['DESCRIZIONE ELEMENTO.3']),
-    // col J = città/area
-    citta:   col(['DESCRIZIONE ELEMENTO.1']),
+    anno:    'A',   // ANNO SPEDIZIONE
+    data:    'H',   // DATA SPEDIZIONE
+    importo: 'Z',   // IMPORTO CONSEGNATO
+    pz:      'Y',   // PZ NETTO VENDITA
+    qty:     'X',   // QTA CONSEGNATA
+    trasp:   'D',   // SPESE DI TRASPORTO
+    causale: 'AA',  // CAUSALE MAGAZZINO
+    cat:     'V',   // col V = DESCRIZIONE ELEMENTO (categoria: SMONTAGOMME, EQUILIBRATRICI...)
+    sottocat:'S',   // col S = DESCRIZIONE ELEMENTO (linea: F 536GT, MEC 10...)
+    agente:  'M',   // col M = DESCRIZIONE ELEMENTO (agente: CABASSI, PEZZALI...)
+    cliente: 'Q',   // RAGIONE SOCIALE 1
+    dest:    'R',   // DESC. DESTINAZIONE 1
+    articolo:'T',   // ARTICOLO
+    desc:    'W',   // col W = DESCRIZIONE (macchina specifica)
+    porto:   'E',   // PORTO
+    nazione: 'P',   // NAZIONE
+    regione: 'O',   // col O = DESCRIZIONE ELEMENTO (regione: LOMBARDIA, VENETO...)
+    citta:   'J',   // col J = DESCRIZIONE ELEMENTO (città: MILANO, PADOVA...)
   };
 
-  console.log('[PezzaliApp v3] Colonne rilevate:',keys.length);
-  console.log('[PezzaliApp v3] CV.cat=',CV.cat,'CV.agente=',CV.agente,'CV.regione=',CV.regione);
+  console.log('[PezzaliApp v3] Lettura per lettera colonna: V=cat, M=agente, O=regione');
 
   const VEND=vRaw.filter(r=>str(r[CV.causale]).toUpperCase().startsWith('V')).map(r=>{
     const cod=str(r[CV.articolo]).replace(/^0+/,'');
@@ -174,14 +180,15 @@ function processData(vRaw,oRaw,lRaw){
   if(catCheck===0) console.warn('[PezzaliApp] ATTENZIONE: nessuna categoria trovata! Col V =',CV.cat,'esempio valore:',vRaw[0]?.[CV.cat]);
 
   // Ordini
-  const OK=Object.keys(oRaw[0]||{});
+  // Ordini: stessa logica per lettera colonna
+  // Ordini Excel: M=cliente, U=descrizione, Y=qtyInevasa, Z=importoInevaso, F=trasp, AB=consegna
   const CO={
-    cliente:['CLIENTE.1','CLIENTE','RAGIONE SOCIALE'].find(c=>OK.includes(c)),
-    desc:   ['DESCRIZIONE'].find(c=>OK.includes(c)),
-    qtyI:   ['QTA INEVASA'].find(c=>OK.includes(c)),
-    importoI:['IMPORTO INEVASO'].find(c=>OK.includes(c)),
-    trasp:  ['SPESE DI TRASPORTO'].find(c=>OK.includes(c)),
-    consegna:['DATA CONSEGNA'].find(c=>OK.includes(c)),
+    cliente: 'M',   // CLIENTE
+    desc:    'U',   // DESCRIZIONE
+    qtyI:    'Y',   // QTA INEVASA
+    importoI:'Z',   // IMPORTO INEVASO
+    trasp:   'F',   // SPESE DI TRASPORTO
+    consegna:'AB',  // DATA CONSEGNA
   };
   const ORDINI=oRaw.map(r=>{
     let consegna=null;
