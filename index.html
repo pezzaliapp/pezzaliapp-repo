@@ -1,569 +1,563 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cascos Analytics — PezzaliApp</title>
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#121212" />
-  <link rel="icon" type="image/png" href="icon.png" />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <style>
-    :root {
-      --bg: #0d0d0d;
-      --bg2: #141414;
-      --bg3: #1a1a1a;
-      --border: #2a2a2a;
-      --green: #00b894;
-      --green2: #00cba3;
-      --red: #e17055;
-      --yellow: #fdcb6e;
-      --blue: #74b9ff;
-      --purple: #a29bfe;
-      --text: #e8e8e8;
-      --text2: #888;
-      --text3: #555;
-      --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
-      --radius: 12px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: 'Space Grotesk', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Cascos Analytics v2 — PezzaliApp</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#080d1a"/>
+<link rel="icon" href="icon.svg"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --bg:#080d1a;--bg1:#0c1222;--bg2:#101828;--bg3:#141e30;--bg4:#1a2540;
+  --border:#1e2d47;--border2:#243353;
+  --green:#00e5a0;--green2:#00b87a;--green-glow:rgba(0,229,160,.16);
+  --red:#ff5f72;--red-glow:rgba(255,95,114,.16);
+  --amber:#ffb547;--amber-glow:rgba(255,181,71,.13);
+  --blue:#4db8ff;--blue-glow:rgba(77,184,255,.13);
+  --purple:#b47aff;--cyan:#00d4e8;
+  --text:#e2eaf8;--text2:#7a9cc0;--text3:#3d5a7a;
+  --sw:220px;--th:56px;--r:10px;--r2:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);
+  display:grid;grid-template-rows:var(--th) 1fr;grid-template-columns:var(--sw) 1fr}
 
-    /* ── TOPBAR ── */
-    .topbar {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(13,13,13,0.92);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 28px; height: 60px;
-    }
-    .topbar-logo { display: flex; align-items: center; gap: 10px; }
-    .topbar-logo svg { width: 28px; height: 28px; }
-    .topbar-logo span { font-weight: 700; font-size: 16px; letter-spacing: -0.3px; }
-    .topbar-logo .dot { color: var(--green); }
-    .topbar-right { display: flex; align-items: center; gap: 14px; }
-    .status-badge {
-      background: rgba(0,184,148,0.12);
-      color: var(--green);
-      border: 1px solid rgba(0,184,148,0.3);
-      font-size: 11px; font-weight: 600;
-      padding: 4px 10px; border-radius: 20px;
-      letter-spacing: 0.5px;
-    }
+/* TOPBAR */
+.topbar{grid-column:1/-1;background:var(--bg1);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;z-index:50}
+.topbar-brand{width:var(--sw);display:flex;align-items:center;gap:10px;padding:0 18px;
+  border-right:1px solid var(--border);height:100%;flex-shrink:0}
+.topbar-brand svg{width:24px;height:24px;flex-shrink:0}
+.brand-name{font-size:13px;font-weight:800;letter-spacing:.5px}
+.brand-name em{color:var(--green);font-style:normal}
+.topbar-filters{flex:1;display:flex;align-items:center;gap:6px;padding:0 14px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.topbar-filters::-webkit-scrollbar{display:none}
+.fl{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
+.fsep{width:1px;height:24px;background:var(--border);flex-shrink:0;margin:0 4px}
+select{background:var(--bg3);border:1px solid var(--border2);color:var(--text);
+  font-family:'Syne',sans-serif;font-size:11px;padding:4px 8px;border-radius:var(--r2);outline:none;cursor:pointer}
+select:focus{border-color:var(--green)}
+.fchip{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border2);
+  border-radius:20px;padding:4px 10px;cursor:pointer;font-size:10px;font-weight:700;
+  transition:all .2s;white-space:nowrap}
+.fchip:hover,.fchip.on{background:var(--green-glow);border-color:var(--green);color:var(--green)}
+.topbar-right{display:flex;align-items:center;gap:8px;padding:0 14px;flex-shrink:0}
+.pill{font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.5px}
+.pill-g{background:var(--green-glow);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+.pill-a{background:var(--amber-glow);color:var(--amber);border:1px solid rgba(255,181,71,.3)}
+.bsm{background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:'Syne',sans-serif;
+  font-size:10px;font-weight:700;padding:4px 10px;border-radius:var(--r2);cursor:pointer;transition:all .2s}
+.bsm:hover{border-color:var(--green);color:var(--green)}
 
-    /* ── UPLOAD SCREEN ── */
-    #upload-screen {
-      min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 40px 20px;
-      background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(0,184,148,0.06) 0%, transparent 70%);
-    }
-    .upload-title {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 700; letter-spacing: -1px;
-      text-align: center; margin-bottom: 8px;
-    }
-    .upload-title em { color: var(--green); font-style: normal; }
-    .upload-subtitle {
-      color: var(--text2); font-size: 15px;
-      text-align: center; margin-bottom: 48px;
-      max-width: 480px; line-height: 1.6;
-    }
-    .upload-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
-      gap: 16px; width: 100%; max-width: 780px; margin-bottom: 32px;
-    }
-    .upload-card {
-      background: var(--bg2);
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 32px 24px;
-      display: flex; flex-direction: column; align-items: center; gap: 12px;
-      cursor: pointer; transition: all 0.25s ease;
-      position: relative; overflow: hidden;
-    }
-    .upload-card:hover, .upload-card.dragover {
-      border-color: var(--green);
-      background: rgba(0,184,148,0.05);
-    }
-    .upload-card.loaded {
-      border-color: var(--green);
-      border-style: solid;
-      background: rgba(0,184,148,0.07);
-    }
-    .upload-card input[type=file] {
-      position: absolute; inset: 0; opacity: 0; cursor: pointer;
-    }
-    .upload-icon {
-      width: 48px; height: 48px; border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-    }
-    .upload-icon.green { background: rgba(0,184,148,0.15); }
-    .upload-icon.blue { background: rgba(116,185,255,0.15); }
-    .upload-icon.yellow { background: rgba(253,203,110,0.15); }
-    .upload-card-label { font-weight: 600; font-size: 14px; text-align: center; }
-    .upload-card-sub { color: var(--text2); font-size: 12px; text-align: center; }
-    .upload-card-check {
-      position: absolute; top: 12px; right: 12px;
-      width: 22px; height: 22px; border-radius: 50%;
-      background: var(--green); color: #000;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; opacity: 0; transition: opacity 0.2s;
-    }
-    .upload-card.loaded .upload-card-check { opacity: 1; }
-    .btn-analyze {
-      background: var(--green); color: #000;
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 15px; font-weight: 700;
-      border: none; border-radius: 10px;
-      padding: 14px 48px; cursor: pointer;
-      transition: all 0.2s; opacity: 0.4; pointer-events: none;
-      letter-spacing: 0.2px;
-    }
-    .btn-analyze.active { opacity: 1; pointer-events: all; }
-    .btn-analyze.active:hover { background: var(--green2); transform: translateY(-1px); }
-    .upload-note {
-      color: var(--text3); font-size: 12px; margin-top: 12px; text-align: center;
-    }
+/* SIDEBAR */
+.sidebar{background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column}
+.sidebar::-webkit-scrollbar{display:none}
+.sb-period{padding:12px 14px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.sb-period-lbl{font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:3px}
+.sb-period-val{font-size:10px;color:var(--green);font-family:'IBM Plex Mono',monospace;line-height:1.4}
+.sb-sec{padding:10px 14px 3px;font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px}
+.ni{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;font-size:11px;font-weight:600;
+  color:var(--text2);border-left:2px solid transparent;transition:all .15s}
+.ni:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.ni.on{color:var(--green);background:var(--green-glow);border-left-color:var(--green)}
+.ni .ic{width:14px;text-align:center;font-size:12px}
+.nbadge{margin-left:auto;font-size:8px;font-weight:700;background:var(--red-glow);color:var(--red);
+  border:1px solid rgba(255,95,114,.3);padding:1px 5px;border-radius:8px}
+.sb-foot{padding:14px;margin-top:auto;font-size:8px;color:var(--text3);font-family:'IBM Plex Mono',monospace;line-height:1.7}
 
-    /* ── LOADING ── */
-    #loading-screen {
-      display: none; position: fixed; inset: 0;
-      background: var(--bg); z-index: 200;
-      flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-    }
-    .spinner {
-      width: 48px; height: 48px;
-      border: 3px solid var(--border);
-      border-top-color: var(--green);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-msg { color: var(--text2); font-size: 14px; font-weight: 500; }
-    .loading-sub { color: var(--text3); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+/* MAIN */
+.main{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
-    /* ── DASHBOARD ── */
-    #dashboard { display: none; }
+/* UPLOAD */
+#upload-screen{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 24px;background:radial-gradient(ellipse 70% 50% at 50% 40%,rgba(0,229,160,.06) 0%,transparent 70%)}
+.uph{font-size:clamp(24px,3vw,40px);font-weight:800;text-align:center;line-height:1.1;margin-bottom:8px}
+.uph em{color:var(--green);font-style:normal}
+.ups{color:var(--text2);font-size:12px;text-align:center;max-width:460px;line-height:1.7;margin-bottom:40px}
+.upg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;width:100%;max-width:720px;margin-bottom:24px}
+.upc{background:var(--bg2);border:1.5px dashed var(--border2);border-radius:var(--r);
+  padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:9px;
+  cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.upc:hover,.upc.drag{border-color:var(--green);background:rgba(0,229,160,.04)}
+.upc.ok{border-style:solid;border-color:var(--green);background:rgba(0,229,160,.05)}
+.upc input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upi{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.upi.g{background:rgba(0,229,160,.15)}.upi.b{background:rgba(77,184,255,.15)}.upi.a{background:rgba(255,181,71,.15)}
+.upt{font-size:12px;font-weight:700;text-align:center}.ups2{font-size:10px;color:var(--text2);text-align:center}
+.upc-chk{position:absolute;top:9px;right:9px;width:18px;height:18px;border-radius:50%;background:var(--green);
+  color:#000;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;opacity:0;transition:.2s}
+.upc.ok .upc-chk{opacity:1}
+.bgo{background:linear-gradient(135deg,var(--green) 0%,var(--cyan) 100%);color:#000;font-family:'Syne',sans-serif;
+  font-size:14px;font-weight:800;border:none;border-radius:var(--r);padding:13px 48px;cursor:pointer;
+  transition:all .25s;opacity:.3;pointer-events:none;letter-spacing:.3px}
+.bgo.on{opacity:1;pointer-events:all}
+.bgo.on:hover{transform:translateY(-2px);box-shadow:0 8px 40px rgba(0,229,160,.35)}
+.upnote{color:var(--text3);font-size:10px;margin-top:9px;font-family:'IBM Plex Mono',monospace}
 
-    .dash-header {
-      padding: 28px 28px 0;
-      display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px;
-    }
-    .dash-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-    .dash-title span { color: var(--green); }
-    .dash-period { color: var(--text2); font-size: 13px; margin-top: 4px; }
-    .btn-reset {
-      background: transparent; border: 1px solid var(--border);
-      color: var(--text2); font-family: 'Space Grotesk', sans-serif;
-      font-size: 12px; padding: 7px 16px; border-radius: 8px;
-      cursor: pointer; transition: all 0.2s;
-    }
-    .btn-reset:hover { border-color: var(--text2); color: var(--text); }
+/* LOADING OVERLAY */
+#loading{display:none;position:fixed;inset:0;background:rgba(8,13,26,.96);z-index:999;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.lring{width:50px;height:50px;border:2.5px solid var(--border2);border-top-color:var(--green);
+  border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ltxt{color:var(--text2);font-size:13px;font-weight:600}
+.lsub{color:var(--text3);font-size:10px;font-family:'IBM Plex Mono',monospace}
 
-    /* ── NAV TABS ── */
-    .nav-tabs {
-      display: flex; gap: 4px;
-      padding: 16px 28px 0;
-      border-bottom: 1px solid var(--border);
-      overflow-x: auto; scrollbar-width: none;
-    }
-    .nav-tabs::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      background: transparent; border: none;
-      color: var(--text2); font-family: 'Space Grotesk', sans-serif;
-      font-size: 13px; font-weight: 600;
-      padding: 10px 16px; cursor: pointer; border-radius: 8px 8px 0 0;
-      white-space: nowrap; transition: all 0.2s;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
-    }
-    .tab-btn:hover { color: var(--text); background: var(--bg2); }
-    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); background: transparent; }
+/* PANELS */
+.panel{display:none;padding:22px}
+.panel.on{display:block}
+.ptitle{font-size:19px;font-weight:800;letter-spacing:-.3px;margin-bottom:3px}
+.psub{font-size:10px;color:var(--text2);font-family:'IBM Plex Mono',monospace;margin-bottom:18px}
 
-    /* ── CONTENT ── */
-    .tab-panel { display: none; padding: 24px 28px; }
-    .tab-panel.active { display: block; }
+/* KPI */
+.kr{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:18px}
+.kk{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 14px 12px;position:relative;overflow:hidden}
+.kk::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kk.g::after{background:linear-gradient(90deg,var(--green),var(--cyan))}
+.kk.b::after{background:linear-gradient(90deg,var(--blue),var(--purple))}
+.kk.a::after{background:linear-gradient(90deg,var(--amber),#ff8c42)}
+.kk.r::after{background:linear-gradient(90deg,var(--red),#ff8c42)}
+.kk.p::after{background:linear-gradient(90deg,var(--purple),var(--blue))}
+.kl{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px}
+.kv{font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1}
+.ka{display:flex;align-items:center;gap:5px;margin-top:5px}
+.ks{font-size:9px;color:var(--text2)}
+.dt{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px}
+.dt.up{background:var(--green-glow);color:var(--green)}
+.dt.dn{background:var(--red-glow);color:var(--red)}
+.dt.nt{background:var(--blue-glow);color:var(--blue)}
 
-    /* ── KPI GRID ── */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 14px; margin-bottom: 24px;
-    }
-    .kpi-card {
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px;
-      position: relative; overflow: hidden;
-      transition: border-color 0.2s;
-    }
-    .kpi-card:hover { border-color: var(--border); }
-    .kpi-card::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    }
-    .kpi-card.green::before { background: var(--green); }
-    .kpi-card.blue::before { background: var(--blue); }
-    .kpi-card.yellow::before { background: var(--yellow); }
-    .kpi-card.red::before { background: var(--red); }
-    .kpi-card.purple::before { background: var(--purple); }
-    .kpi-label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px; }
-    .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
-    .kpi-sub { font-size: 12px; color: var(--text2); margin-top: 6px; }
-    .kpi-delta {
-      display: inline-flex; align-items: center; gap: 3px;
-      font-size: 11px; font-weight: 600; padding: 2px 7px;
-      border-radius: 4px; margin-top: 6px;
-    }
-    .kpi-delta.up { background: rgba(0,184,148,0.15); color: var(--green); }
-    .kpi-delta.down { background: rgba(225,112,85,0.15); color: var(--red); }
+/* CHART GRIDS */
+.cg{display:grid;gap:12px;margin-bottom:12px}
+.c1{grid-template-columns:1fr}
+.c2{grid-template-columns:1fr 1fr}
+.c21{grid-template-columns:2fr 1fr}
+.c12{grid-template-columns:1fr 2fr}
+.c3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:1050px){.c2,.c21,.c12,.c3{grid-template-columns:1fr}}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.cc-h{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:8px}
+.cc-t{font-size:11px;font-weight:700}
+.cc-s{font-size:9px;color:var(--text2);margin-top:2px;font-family:'IBM Plex Mono',monospace}
+.cbadge{font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px;white-space:nowrap}
+.cbadge-r{background:var(--red-glow);color:var(--red)}
+.cbadge-g{background:var(--green-glow);color:var(--green)}
+.cbadge-a{background:var(--amber-glow);color:var(--amber)}
+.cw{position:relative}
+.h160{height:160px}.h200{height:200px}.h240{height:240px}.h270{height:270px}.h300{height:300px}.h320{height:320px}
 
-    /* ── CHART CARDS ── */
-    .chart-grid { display: grid; gap: 16px; margin-bottom: 24px; }
-    .chart-grid.col2 { grid-template-columns: 1fr 1fr; }
-    .chart-grid.col3 { grid-template-columns: 2fr 1fr; }
-    @media (max-width: 900px) {
-      .chart-grid.col2, .chart-grid.col3 { grid-template-columns: 1fr; }
-    }
-    .chart-card {
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px;
-    }
-    .chart-title {
-      font-size: 13px; font-weight: 700;
-      letter-spacing: 0.2px; margin-bottom: 4px;
-    }
-    .chart-sub { font-size: 11px; color: var(--text2); margin-bottom: 18px; }
-    .chart-wrap { position: relative; height: 220px; }
-    .chart-wrap.tall { height: 300px; }
+/* TABLES */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{background:var(--bg3);color:var(--text3);font-size:8px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;padding:8px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);
+  cursor:pointer;user-select:none}
+thead th:hover{color:var(--text2)}
+thead th.sa::after{content:' ↑'}
+thead th.sd::after{content:' ↓'}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s}
+tbody tr:hover{background:rgba(255,255,255,.025)}
+tbody td{padding:7px 10px;vertical-align:middle}
+.mo{font-family:'IBM Plex Mono',monospace;font-size:9px}
+.bdg{display:inline-flex;align-items:center;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700}
+.bg{background:var(--green-glow);color:var(--green)}
+.br{background:var(--red-glow);color:var(--red)}
+.ba{background:var(--amber-glow);color:var(--amber)}
+.bb{background:var(--blue-glow);color:var(--blue)}
+.bp{background:rgba(180,122,255,.15);color:var(--purple)}
 
-    /* ── TABLE ── */
-    .table-wrap { overflow-x: auto; border-radius: 8px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    thead th {
-      background: var(--bg3); color: var(--text2);
-      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
-      padding: 10px 14px; text-align: left; white-space: nowrap;
-      border-bottom: 1px solid var(--border);
-    }
-    tbody tr {
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      transition: background 0.15s;
-    }
-    tbody tr:hover { background: rgba(255,255,255,0.03); }
-    tbody td { padding: 10px 14px; color: var(--text); }
-    .td-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-    .badge {
-      display: inline-flex; align-items: center;
-      padding: 2px 8px; border-radius: 4px;
-      font-size: 11px; font-weight: 600;
-    }
-    .badge-green { background: rgba(0,184,148,0.15); color: var(--green); }
-    .badge-red { background: rgba(225,112,85,0.15); color: var(--red); }
-    .badge-yellow { background: rgba(253,203,110,0.15); color: var(--yellow); }
-    .badge-blue { background: rgba(116,185,255,0.15); color: var(--blue); }
-    .badge-purple { background: rgba(162,155,254,0.15); color: var(--purple); }
+/* SEARCH */
+.sw2{position:relative;margin-bottom:10px}
+.sw2 input{width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);
+  font-family:'Syne',sans-serif;font-size:11px;padding:7px 10px 7px 28px;border-radius:var(--r2);outline:none}
+.sw2 input:focus{border-color:var(--green)}
+.sw2::before{content:'⌕';position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px}
 
-    /* ── ALERT PANEL ── */
-    .alert-list { display: flex; flex-direction: column; gap: 10px; }
-    .alert-item {
-      background: var(--bg3); border-radius: 10px; padding: 14px 18px;
-      display: flex; align-items: flex-start; gap: 12px;
-      border-left: 3px solid transparent;
-    }
-    .alert-item.warn { border-left-color: var(--yellow); }
-    .alert-item.danger { border-left-color: var(--red); }
-    .alert-item.info { border-left-color: var(--blue); }
-    .alert-item.ok { border-left-color: var(--green); }
-    .alert-icon { font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
-    .alert-text strong { display: block; font-size: 13px; margin-bottom: 2px; }
-    .alert-text p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+/* ALERTS */
+.alerts{display:flex;flex-direction:column;gap:10px}
+.al{background:var(--bg2);border-radius:var(--r);padding:14px 16px;display:flex;align-items:flex-start;gap:12px;
+  border-left:3px solid transparent;transition:all .2s}
+.al:hover{transform:translateX(3px)}
+.al.danger{border-left-color:var(--red);background:rgba(255,95,114,.04)}
+.al.warn{border-left-color:var(--amber);background:rgba(255,181,71,.04)}
+.al.ok{border-left-color:var(--green);background:rgba(0,229,160,.04)}
+.al.info{border-left-color:var(--blue);background:rgba(77,184,255,.04)}
+.al-ic{font-size:18px;flex-shrink:0;margin-top:1px}
+.al-b strong{font-size:12px;display:block;margin-bottom:3px}
+.al-b p{font-size:11px;color:var(--text2);line-height:1.6}
 
-    /* ── PROGRESS BAR ── */
-    .prog-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-    .prog-label { display: flex; justify-content: space-between; font-size: 12px; }
-    .prog-label span:last-child { color: var(--text2); font-family: 'JetBrains Mono', monospace; }
-    .prog-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
-    .prog-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+/* HEATMAP */
+.hm{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+.hmc{background:var(--bg3);border-radius:var(--r2);padding:11px;border:1px solid var(--border);position:relative;overflow:hidden}
+.hmg{position:absolute;inset:0;opacity:.07;border-radius:inherit}
+.hmn{font-size:8px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;line-height:1.3}
+.hmv{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.hms{font-size:8px;color:var(--text3);margin-top:2px}
+.hmbar{height:3px;background:var(--border);border-radius:2px;margin-top:7px;overflow:hidden}
+.hmfill{height:100%;border-radius:2px}
 
-    /* ── DISCOUNT METER ── */
-    .disc-meter {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
-      gap: 12px; margin-bottom: 24px;
-    }
-    .disc-card {
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 16px;
-    }
-    .disc-name { font-size: 11px; color: var(--text2); margin-bottom: 8px; font-weight: 600; letter-spacing: 0.5px; }
-    .disc-value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-    .disc-gauge { height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 8px; overflow: hidden; }
-    .disc-fill { height: 100%; border-radius: 2px; }
+/* AGENT RANK */
+.agr{display:flex;flex-direction:column;gap:8px}
+.agrow{background:var(--bg3);border-radius:var(--r2);padding:11px 12px;border:1px solid var(--border);transition:background .15s}
+.agrow:hover{background:var(--bg4)}
+.agrow-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.agno{font-size:10px;font-weight:800;color:var(--text3);font-family:'IBM Plex Mono',monospace;width:20px}
+.agname{font-size:12px;font-weight:700;flex:1}
+.agval{font-size:11px;font-weight:700;color:var(--green);font-family:'IBM Plex Mono',monospace}
+.agbar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.agfill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--green),var(--cyan))}
 
-    /* ── ORDER TIMELINE ── */
-    .timeline { display: flex; flex-direction: column; gap: 0; }
-    .tl-item {
-      display: grid; grid-template-columns: 90px 1fr;
-      gap: 16px; padding: 12px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-    }
-    .tl-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text2); padding-top: 2px; }
-    .tl-content strong { font-size: 13px; display: block; margin-bottom: 2px; }
-    .tl-content span { font-size: 12px; color: var(--text2); }
+/* COMPARE BAR */
+.cmpbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r2);padding:8px 12px;margin-bottom:12px}
+.cmpbar label{font-size:10px;font-weight:600;color:var(--text2)}
 
-    /* ── SECTION HEADER ── */
-    .section-header {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 16px;
-    }
-    .section-header h3 { font-size: 14px; font-weight: 700; }
-    .section-header .line { flex: 1; height: 1px; background: var(--border); }
+/* ANIMATIONS */
+@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fa{animation:fu .4s ease both}
+.d1{animation-delay:.06s}.d2{animation-delay:.12s}.d3{animation-delay:.18s}
 
-    /* ── UTILS ── */
-    .mt8 { margin-top: 8px; }
-    .mt16 { margin-top: 16px; }
-    .mt24 { margin-top: 24px; }
-    .row { display: flex; gap: 16px; flex-wrap: wrap; }
-    .col { flex: 1; min-width: 220px; }
-
-    /* ── SCROLLBAR ── */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-    /* ── FADE IN ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .fade-in { animation: fadeUp 0.45s ease both; }
-    .delay1 { animation-delay: 0.05s; }
-    .delay2 { animation-delay: 0.10s; }
-    .delay3 { animation-delay: 0.15s; }
-    .delay4 { animation-delay: 0.20s; }
-    .delay5 { animation-delay: 0.25s; }
-  </style>
+[hidden]{display:none!important}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
 </head>
 <body>
 
-<!-- ══════════════ TOPBAR ══════════════ -->
+<!-- TOPBAR -->
 <header class="topbar">
-  <div class="topbar-logo">
-    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="28" height="28" rx="7" fill="#00b894" fill-opacity="0.15"/>
-      <path d="M7 21L7 14M11 21V10M15 21V13M19 21V7" stroke="#00b894" stroke-width="2.2" stroke-linecap="round"/>
-    </svg>
-    <span>Cascos <span class="dot">Analytics</span></span>
+  <div class="topbar-brand">
+    <svg viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#00e5a0" fill-opacity=".12"/>
+    <path d="M4 18V12M8 18V7M12 18V10M16 18V4M20 18V8" stroke="#00e5a0" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <div class="brand-name">Cascos <em>Analytics</em></div>
   </div>
+
+  <div class="topbar-filters" id="top-filters" hidden>
+    <span class="fl">Da</span>
+    <select id="f-da" onchange="applyFilters()"></select>
+    <span class="fl">A</span>
+    <select id="f-a" onchange="applyFilters()"></select>
+    <div class="fsep"></div>
+    <span class="fl">Periodo</span>
+    <select id="f-per" onchange="applyFilters()">
+      <option value="">Anno intero</option>
+      <option value="q1">Q1 Gen–Mar</option><option value="q2">Q2 Apr–Giu</option>
+      <option value="q3">Q3 Lug–Set</option><option value="q4">Q4 Ott–Dic</option>
+      <option value="m1">Gen</option><option value="m2">Feb</option><option value="m3">Mar</option>
+      <option value="m4">Apr</option><option value="m5">Mag</option><option value="m6">Giu</option>
+      <option value="m7">Lug</option><option value="m8">Ago</option><option value="m9">Set</option>
+      <option value="m10">Ott</option><option value="m11">Nov</option><option value="m12">Dic</option>
+    </select>
+    <div class="fsep"></div>
+    <div class="fchip" id="chip-cmp" onclick="toggleCompare()">⚡ Confronta</div>
+    <select id="f-cmp-a" style="display:none" onchange="applyFilters()"></select>
+    <div class="fsep"></div>
+    <span class="fl">Agente</span>
+    <select id="f-agt" onchange="applyFilters()"><option value="">Tutti</option></select>
+  </div>
+
   <div class="topbar-right">
-    <span class="status-badge" id="status-badge">PRONTO</span>
+    <span class="pill pill-g" id="status-pill">PRONTO</span>
+    <button class="bsm" id="btn-reset" onclick="resetApp()" hidden>↩ Reset</button>
   </div>
 </header>
 
-<!-- ══════════════ UPLOAD SCREEN ══════════════ -->
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sb-period">
+    <div class="sb-period-lbl">Periodo attivo</div>
+    <div class="sb-period-val" id="sb-period">—</div>
+  </div>
+  <div class="sb-sec">Cruscotto</div>
+  <div class="ni on" onclick="go('overview')"><span class="ic">📊</span>Overview</div>
+  <div class="ni" onclick="go('trend')"><span class="ic">📈</span>Trend & Confronto</div>
+  <div class="sb-sec">Analisi</div>
+  <div class="ni" onclick="go('vendite')"><span class="ic">💶</span>Vendite Categoria</div>
+  <div class="ni" onclick="go('clienti')"><span class="ic">🏢</span>Clienti & Storico</div>
+  <div class="ni" onclick="go('agenti')"><span class="ic">👤</span>Ranking Agenti</div>
+  <div class="ni" onclick="go('sconti')"><span class="ic">🏷️</span>Sconti per Macchina</div>
+  <div class="ni" onclick="go('margine')"><span class="ic">⚖️</span>Marginalità</div>
+  <div class="ni" onclick="go('trasporti')"><span class="ic">🚚</span>Trasporti</div>
+  <div class="ni" onclick="go('ordini')"><span class="ic">📋</span>Ordini Inevasi</div>
+  <div class="sb-sec">Alert</div>
+  <div class="ni" onclick="go('criticita')"><span class="ic">⚠️</span>Criticità<span class="nbadge" id="nbadge">—</span></div>
+  <div class="sb-foot">PezzaliApp · Cormach Srl<br>Cascos Analytics v2.0<br>© 2026</div>
+</nav>
+
+<!-- MAIN -->
+<main class="main" id="main">
+
+<!-- UPLOAD -->
 <div id="upload-screen">
-  <h1 class="upload-title">Dashboard <em>Vendite & Ordini</em></h1>
-  <p class="upload-subtitle">Carica i file Excel per generare l'analisi completa: fatturato, sconti, trasporti, criticità e ordini inevasi.</p>
-
-  <div class="upload-grid">
-    <label class="upload-card" id="card-vendite">
-      <input type="file" id="file-vendite" accept=".xlsx,.xls" />
-      <div class="upload-icon green">📊</div>
-      <div class="upload-card-label">Vendite</div>
-      <div class="upload-card-sub" id="vendite-name">XLSX — Spedizioni & Resi</div>
-      <div class="upload-card-check">✓</div>
-    </label>
-
-    <label class="upload-card" id="card-ordini">
-      <input type="file" id="file-ordini" accept=".xlsx,.xls" />
-      <div class="upload-icon blue">📋</div>
-      <div class="upload-card-label">Ordini</div>
-      <div class="upload-card-sub" id="ordini-name">XLSX — Ordini Clienti</div>
-      <div class="upload-card-check">✓</div>
-    </label>
-
-    <label class="upload-card" id="card-listino">
-      <input type="file" id="file-listino" accept=".csv,.xlsx,.xls" />
-      <div class="upload-icon yellow">💰</div>
-      <div class="upload-card-label">Listino Prezzi</div>
-      <div class="upload-card-sub" id="listino-name">CSV — Prezzi Lordi</div>
-      <div class="upload-card-check">✓</div>
-    </label>
+  <h1 class="uph">Dashboard <em>Vendite Cascos</em></h1>
+  <p class="ups">Cruscotto professionale con analisi sconti per macchina, erosione margine, ranking agenti, confronto periodi e ordini inevasi.</p>
+  <div class="upg">
+    <label class="upc" id="uc-v"><input type="file" id="fi-v" accept=".xlsx,.xls"/>
+      <div class="upi g">📊</div><div class="upt">File Vendite</div>
+      <div class="ups2" id="fn-v">XLSX — Spedizioni & Resi</div><div class="upc-chk">✓</div></label>
+    <label class="upc" id="uc-o"><input type="file" id="fi-o" accept=".xlsx,.xls"/>
+      <div class="upi b">📋</div><div class="upt">File Ordini</div>
+      <div class="ups2" id="fn-o">XLSX — Ordini Clienti</div><div class="upc-chk">✓</div></label>
+    <label class="upc" id="uc-l"><input type="file" id="fi-l" accept=".csv,.xlsx,.xls"/>
+      <div class="upi a">💰</div><div class="upt">Listino Prezzi</div>
+      <div class="ups2" id="fn-l">CSV — Prezzi Lordi (opzionale)</div><div class="upc-chk">✓</div></label>
   </div>
-
-  <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis()">
-    ⚡ Analizza Dashboard
-  </button>
-  <p class="upload-note">I file vengono elaborati localmente nel browser — nessun dato inviato a server esterni.</p>
+  <button class="bgo" id="btn-go" onclick="runAnalysis()">⚡ Genera Dashboard</button>
+  <div class="upnote">Elaborazione locale — nessun dato inviato a server esterni</div>
 </div>
 
-<!-- ══════════════ LOADING ══════════════ -->
-<div id="loading-screen" style="display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; position:fixed; inset:0; background:var(--bg); z-index:200;">
-  <div class="spinner"></div>
-  <div class="loading-msg" id="loading-msg">Elaborazione dati...</div>
-  <div class="loading-sub" id="loading-sub">Caricamento file in corso</div>
+<!-- LOADING -->
+<div id="loading">
+  <div class="lring"></div>
+  <div class="ltxt" id="lmsg">Elaborazione...</div>
+  <div class="lsub" id="lsub">Caricamento file</div>
 </div>
 
-<!-- ══════════════ DASHBOARD ══════════════ -->
-<div id="dashboard">
-  <div class="dash-header">
-    <div>
-      <div class="dash-title">Analisi <span>Cormach Srl</span> — Cascos</div>
-      <div class="dash-period" id="dash-period">Periodo: —</div>
+<!-- PANEL: OVERVIEW -->
+<div class="panel" id="panel-overview">
+  <div class="ptitle">Overview Generale</div>
+  <div class="psub" id="ov-sub">—</div>
+  <div class="kr fa" id="kr-ov"></div>
+  <div class="cg c21 fa d1">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Fatturato Annuale + Trasporti</div><div class="cc-s">Barre = fatturato · Linea = trasporto</div></div></div>
+      <div class="cw h300"><canvas id="ch-annual"></canvas></div>
     </div>
-    <button class="btn-reset" onclick="resetApp()">↩ Nuovo Caricamento</button>
-  </div>
-
-  <nav class="nav-tabs">
-    <button class="tab-btn active" onclick="showTab('overview')">📈 Overview</button>
-    <button class="tab-btn" onclick="showTab('vendite')">💶 Vendite</button>
-    <button class="tab-btn" onclick="showTab('sconti')">🏷️ Sconti</button>
-    <button class="tab-btn" onclick="showTab('trasporti')">🚚 Trasporti</button>
-    <button class="tab-btn" onclick="showTab('ordini')">📋 Ordini</button>
-    <button class="tab-btn" onclick="showTab('criticita')">⚠️ Criticità</button>
-  </nav>
-
-  <!-- TAB: OVERVIEW -->
-  <div id="tab-overview" class="tab-panel active">
-    <div class="kpi-grid fade-in" id="kpi-overview"></div>
-    <div class="chart-grid col3 fade-in delay2">
-      <div class="chart-card">
-        <div class="chart-title">Fatturato Annuale</div>
-        <div class="chart-sub">Andamento storico vendite (causale V)</div>
-        <div class="chart-wrap tall"><canvas id="chart-annual"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Mix Categorie</div>
-        <div class="chart-sub">Fatturato per famiglia prodotto</div>
-        <div class="chart-wrap tall"><canvas id="chart-cat-pie"></canvas></div>
-      </div>
-    </div>
-    <div class="chart-grid col2 fade-in delay3">
-      <div class="chart-card">
-        <div class="chart-title">Andamento 2025 vs 2024 — Mensile</div>
-        <div class="chart-sub">Confronto fatturato mese su mese</div>
-        <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Top 10 Clienti 2024–2026</div>
-        <div class="chart-sub">Fatturato cumulativo</div>
-        <div class="chart-wrap"><canvas id="chart-top-cli"></canvas></div>
-      </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Mix Categorie</div><div class="cc-s">% fatturato periodo filtrato</div></div></div>
+      <div class="cw h300"><canvas id="ch-pie"></canvas></div>
     </div>
   </div>
-
-  <!-- TAB: VENDITE -->
-  <div id="tab-vendite" class="tab-panel">
-    <div class="kpi-grid fade-in" id="kpi-vendite"></div>
-    <div class="chart-grid col2 fade-in delay1">
-      <div class="chart-card">
-        <div class="chart-title">Fatturato per Categoria</div>
-        <div class="chart-sub">Contributo al fatturato totale</div>
-        <div class="chart-wrap tall"><canvas id="chart-cat-bar"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Vendite per Agente</div>
-        <div class="chart-sub">Fatturato 2024–2026 per agente</div>
-        <div class="chart-wrap tall"><canvas id="chart-agent"></canvas></div>
-      </div>
+  <div class="cg c2 fa d2">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Andamento Trimestrale</div><div class="cc-s">Fatturato per quarter · tutti gli anni</div></div></div>
+      <div class="cw h220"><canvas id="ch-qtr"></canvas></div>
     </div>
-    <div class="fade-in delay2">
-      <div class="section-header mt16"><h3>Top Clienti 2024–2026</h3><div class="line"></div></div>
-      <div class="table-wrap"><table id="table-clienti"></table></div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Top 10 Clienti — Periodo</div><div class="cc-s">Fatturato cumulativo</div></div></div>
+      <div class="cw h220"><canvas id="ch-top-cli"></canvas></div>
     </div>
-  </div>
-
-  <!-- TAB: SCONTI -->
-  <div id="tab-sconti" class="tab-panel">
-    <div class="kpi-grid fade-in" id="kpi-sconti"></div>
-    <div class="disc-meter fade-in delay1" id="disc-meter"></div>
-    <div class="chart-grid col2 fade-in delay2">
-      <div class="chart-card">
-        <div class="chart-title">Sconto Medio Annuale</div>
-        <div class="chart-sub">Evoluzione dello sconto medio applicato (su articoli listino)</div>
-        <div class="chart-wrap"><canvas id="chart-disc-annual"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Distribuzione Sconti</div>
-        <div class="chart-sub">Frequenza per fascia sconto</div>
-        <div class="chart-wrap"><canvas id="chart-disc-dist"></canvas></div>
-      </div>
-    </div>
-    <div class="fade-in delay3">
-      <div class="section-header mt16">
-        <h3>⚠️ Vendite con Sconto &gt; 60% (Max Contrattuale)</h3>
-        <div class="line"></div>
-      </div>
-      <div class="table-wrap"><table id="table-over60"></table></div>
-    </div>
-  </div>
-
-  <!-- TAB: TRASPORTI -->
-  <div id="tab-trasporti" class="tab-panel">
-    <div class="kpi-grid fade-in" id="kpi-trasporti"></div>
-    <div class="chart-grid col2 fade-in delay1">
-      <div class="chart-card">
-        <div class="chart-title">Costo Trasporto & Incidenza %</div>
-        <div class="chart-sub">Spese di trasporto annuali e % sul fatturato</div>
-        <div class="chart-wrap"><canvas id="chart-transport"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Distribuzione Porto</div>
-        <div class="chart-sub">Tipologia porto nelle spedizioni</div>
-        <div class="chart-wrap"><canvas id="chart-porto"></canvas></div>
-      </div>
-    </div>
-    <div class="fade-in delay2">
-      <div class="section-header mt16"><h3>Analisi Trasporti per Anno</h3><div class="line"></div></div>
-      <div class="table-wrap"><table id="table-transport"></table></div>
-    </div>
-  </div>
-
-  <!-- TAB: ORDINI -->
-  <div id="tab-ordini" class="tab-panel">
-    <div class="kpi-grid fade-in" id="kpi-ordini"></div>
-    <div class="chart-grid col2 fade-in delay1">
-      <div class="chart-card">
-        <div class="chart-title">Ordini per Cliente</div>
-        <div class="chart-sub">Importo inevaso per cliente</div>
-        <div class="chart-wrap"><canvas id="chart-ordini-cli"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Scadenze Consegna</div>
-        <div class="chart-sub">Valore ordini per data consegna prevista</div>
-        <div class="chart-wrap"><canvas id="chart-ordini-date"></canvas></div>
-      </div>
-    </div>
-    <div class="fade-in delay2">
-      <div class="section-header mt16"><h3>Dettaglio Ordini Inevasi</h3><div class="line"></div></div>
-      <div class="table-wrap"><table id="table-ordini"></table></div>
-    </div>
-  </div>
-
-  <!-- TAB: CRITICITÀ -->
-  <div id="tab-criticita" class="tab-panel">
-    <div class="section-header fade-in"><h3>Criticità Rilevate</h3><div class="line"></div></div>
-    <div class="alert-list fade-in delay1" id="alert-list"></div>
   </div>
 </div>
+
+<!-- PANEL: TREND -->
+<div class="panel" id="panel-trend">
+  <div class="ptitle">Trend & Confronto Periodi</div>
+  <div class="psub">Confronta mensile o trimestrale tra due anni a scelta</div>
+  <div class="cmpbar fa">
+    <label>Anno A:</label><select id="tr-a1" onchange="renderTrend()"></select>
+    <label style="margin-left:8px">Anno B:</label><select id="tr-a2" onchange="renderTrend()"></select>
+    <div class="fsep"></div>
+    <label>Vista:</label>
+    <select id="tr-view" onchange="renderTrend()">
+      <option value="m">Mensile</option><option value="q">Trimestrale</option>
+    </select>
+    <div class="fsep"></div>
+    <label>Metrica:</label>
+    <select id="tr-met" onchange="renderTrend()">
+      <option value="f">Fatturato</option><option value="t">Trasporto</option>
+      <option value="s">Sconto %</option><option value="n">N° Righe</option>
+    </select>
+  </div>
+  <div class="cc fa d1">
+    <div class="cc-h"><div><div class="cc-t" id="tr-title">Confronto Mensile</div><div class="cc-s" id="tr-sub">—</div></div><div id="tr-kpi-delta"></div></div>
+    <div class="cw h300"><canvas id="ch-trend"></canvas></div>
+  </div>
+  <div class="cg c2 fa d2">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Cumulato Progressivo</div><div class="cc-s">Fatturato cumulativo anno A vs B</div></div></div>
+      <div class="cw h220"><canvas id="ch-cumul"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Δ Variazione %</div><div class="cc-s">Differenza periodo anno B vs A</div></div></div>
+      <div class="cw h220"><canvas id="ch-delta"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL: VENDITE -->
+<div class="panel" id="panel-vendite">
+  <div class="ptitle">Vendite per Categoria</div>
+  <div class="psub">Drill-down clicca su una categoria per vedere i clienti</div>
+  <div class="kr fa" id="kr-vend"></div>
+  <div class="cg c2 fa d1">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Fatturato per Categoria</div><div class="cc-s">Clicca barra → drill-down clienti</div></div></div>
+      <div class="cw h280"><canvas id="ch-cat-bar"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Pezzi per Categoria</div><div class="cc-s">Volume unitario venduto</div></div></div>
+      <div class="cw h280"><canvas id="ch-cat-qty"></canvas></div>
+    </div>
+  </div>
+  <div class="cc fa d2" id="drill-cc" hidden>
+    <div class="cc-h"><div><div class="cc-t" id="drill-t">Clienti —</div><div class="cc-s">Clienti nella categoria selezionata</div></div>
+      <button class="bsm" onclick="closeDrill()">✕</button></div>
+    <div class="tw"><table id="tbl-drill"></table></div>
+  </div>
+  <div class="cc fa d3">
+    <div class="cc-h"><div><div class="cc-t">Riepilogo Categorie</div><div class="cc-s">Ordinabile — clicca intestazione</div></div></div>
+    <div class="tw"><table id="tbl-cat"></table></div>
+  </div>
+</div>
+
+<!-- PANEL: CLIENTI -->
+<div class="panel" id="panel-clienti">
+  <div class="ptitle">Clienti & Storico Acquisti</div>
+  <div class="psub">Ranking, storico mensile, ricerca rapida</div>
+  <div class="cg c2 fa">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Top 12 Clienti — Periodo</div><div class="cc-s">Fatturato nel periodo filtrato</div></div></div>
+      <div class="cw h280"><canvas id="ch-cli-rank"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Storico Cliente</div><div class="cc-s">Fatturato mensile per cliente selezionato</div></div></div>
+      <div style="margin-bottom:8px"><select id="cli-sel" onchange="renderCliStorico()" style="width:100%;padding:5px 8px;font-size:11px"></select></div>
+      <div class="cw h220"><canvas id="ch-cli-st"></canvas></div>
+    </div>
+  </div>
+  <div class="cc fa d2">
+    <div class="cc-h"><div><div class="cc-t">Tutti i Clienti</div><div class="cc-s">Ordinabile · cerca per nome</div></div></div>
+    <div class="sw2"><input type="text" id="cli-srch" placeholder="Cerca cliente..." oninput="filterCliTbl()"/></div>
+    <div class="tw"><table id="tbl-cli"></table></div>
+  </div>
+</div>
+
+<!-- PANEL: AGENTI -->
+<div class="panel" id="panel-agenti">
+  <div class="ptitle">Ranking Agenti</div>
+  <div class="psub">Performance commerciale nel periodo filtrato</div>
+  <div class="kr fa" id="kr-agt"></div>
+  <div class="cg c2 fa d1">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Fatturato per Agente</div><div class="cc-s">Periodo corrente</div></div></div>
+      <div class="cw h260"><canvas id="ch-agt-bar"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Evoluzione Agenti per Anno</div><div class="cc-s">Trend storico</div></div></div>
+      <div class="cw h260"><canvas id="ch-agt-evol"></canvas></div>
+    </div>
+  </div>
+  <div class="cc fa d2">
+    <div class="cc-h"><div><div class="cc-t">Ranking Dettaglio</div></div></div>
+    <div class="agr" id="agr"></div>
+  </div>
+</div>
+
+<!-- PANEL: SCONTI -->
+<div class="panel" id="panel-sconti">
+  <div class="ptitle">Sconti per Macchina / Prodotto</div>
+  <div class="psub">Sconto medio per articolo · soglia contrattuale max 60%</div>
+  <div class="kr fa" id="kr-sc"></div>
+  <div class="cg c2 fa d1">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Sconto Medio per Anno</div><div class="cc-s">Linea rossa = soglia contrattuale 60%</div></div></div>
+      <div class="cw h220"><canvas id="ch-sc-yr"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Distribuzione Sconti</div><div class="cc-s">Frequenza per fascia · rosso = oltre soglia</div></div></div>
+      <div class="cw h220"><canvas id="ch-sc-dist"></canvas></div>
+    </div>
+  </div>
+  <div class="cc fa d2">
+    <div class="cc-h">
+      <div><div class="cc-t">Sconto per Prodotto/Macchina</div><div class="cc-s">Semaforo sconto · su articoli presenti in listino</div></div>
+      <select id="sc-flt" onchange="renderScontiTbl()" style="font-size:10px">
+        <option value="all">Tutti</option><option value="over">Solo &gt;60%</option><option value="ok">Solo ≤60%</option>
+      </select>
+    </div>
+    <div class="sw2"><input type="text" id="sc-srch" placeholder="Cerca prodotto..." oninput="renderScontiTbl()"/></div>
+    <div class="tw"><table id="tbl-sc"></table></div>
+  </div>
+  <div class="cc fa d3" style="margin-top:12px">
+    <div class="cc-h"><div><div class="cc-t">Top Clienti con Sconto &gt;60%</div><div class="cc-s">Clienti con più transazioni oltre soglia contrattuale</div></div></div>
+    <div class="tw"><table id="tbl-over60-cli"></table></div>
+  </div>
+</div>
+
+<!-- PANEL: MARGINE -->
+<div class="panel" id="panel-margine">
+  <div class="ptitle">Marginalità & Erosione Margine</div>
+  <div class="psub">Sconto% + incidenza trasporto% = % margine reale eroso per categoria</div>
+  <div class="hm fa" id="hm-margine"></div>
+  <div class="cg c2 fa d1">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Erosione per Categoria</div><div class="cc-s">Sconto + Trasporto = % totale erosa</div></div></div>
+      <div class="cw h260"><canvas id="ch-eros"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Sconto vs Incidenza Trasporto</div><div class="cc-s">Scatter — ogni punto = categoria</div></div></div>
+      <div class="cw h260"><canvas id="ch-scatter"></canvas></div>
+    </div>
+  </div>
+  <div class="cc fa d2">
+    <div class="cc-h"><div><div class="cc-t">Riepilogo Marginalità per Categoria</div></div></div>
+    <div class="tw"><table id="tbl-marg"></table></div>
+  </div>
+</div>
+
+<!-- PANEL: TRASPORTI -->
+<div class="panel" id="panel-trasporti">
+  <div class="ptitle">Analisi Trasporti</div>
+  <div class="psub">Spese di trasporto, incidenza sul fatturato, distribuzione porto</div>
+  <div class="kr fa" id="kr-tr"></div>
+  <div class="cg c21 fa d1">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Trasporto & Incidenza per Anno</div><div class="cc-s">Barre = € trasporto · Linea = % su fatturato</div></div></div>
+      <div class="cw h260"><canvas id="ch-tr-yr"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Distribuzione Porto</div><div class="cc-s">N° spedizioni per tipo</div></div></div>
+      <div class="cw h260"><canvas id="ch-porto"></canvas></div>
+    </div>
+  </div>
+  <div class="cc fa d2">
+    <div class="cc-h"><div><div class="cc-t">Dettaglio per Anno</div></div></div>
+    <div class="tw"><table id="tbl-tr"></table></div>
+  </div>
+</div>
+
+<!-- PANEL: ORDINI -->
+<div class="panel" id="panel-ordini">
+  <div class="ptitle">Ordini Inevasi</div>
+  <div class="psub">Portafoglio ordini aperti, scadenze, priorità evasione</div>
+  <div class="kr fa" id="kr-ord"></div>
+  <div class="cg c2 fa d1">
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Valore Inevaso per Cliente</div><div class="cc-s">Top 12 clienti</div></div></div>
+      <div class="cw h260"><canvas id="ch-ord-cli"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div><div class="cc-t">Scadenze Consegna</div><div class="cc-s">Valore per data prevista</div></div></div>
+      <div class="cw h260"><canvas id="ch-ord-date"></canvas></div>
+    </div>
+  </div>
+  <div class="cc fa d2">
+    <div class="cc-h"><div><div class="cc-t">Dettaglio Ordini — Priorità Evasione</div></div><span id="ord-scad" class="cbadge cbadge-r"></span></div>
+    <div class="sw2"><input type="text" id="ord-srch" placeholder="Cerca cliente o prodotto..." oninput="filterOrdTbl()"/></div>
+    <div class="tw"><table id="tbl-ord"></table></div>
+  </div>
+</div>
+
+<!-- PANEL: CRITICITÀ -->
+<div class="panel" id="panel-criticita">
+  <div class="ptitle">Criticità & Alert Automatici</div>
+  <div class="psub">Anomalie e segnalazioni rilevate automaticamente</div>
+  <div class="alerts fa" id="alerts"></div>
+</div>
+
+</main>
 
 <script src="app.js"></script>
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-}
-</script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{})</script>
 </body>
 </html>
