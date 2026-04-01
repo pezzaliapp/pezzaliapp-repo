@@ -15,6 +15,7 @@ const CASCOS_PAT = /\bC\s*3[.,]2|\bC\s*3[.,]5|\bC\s*4\s*(XL|s|S|\b)|\bC\s*5\s*(X
 const CASCOS_EX  = /PFA\s*\d+|STD\s*72|FORBICE|SCHEDA|CENTRALINA|POMPA|FOTOCELLULA|USATO|CARTER/i;
 
 let G={}, F={}, CMP=false, charts={}, sortState={};
+const BUDGET_KEY='pza-budgets-v1';
 
 function tc(){
   const dark = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -30,6 +31,119 @@ function tc(){
     border: dark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)',
     tip:    {bg:dark?'#1a2233':'#fff', border:dark?'rgba(255,255,255,.1)':'rgba(0,0,0,.1)'}
   };
+}
+
+
+
+function loadBudgets(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(BUDGET_KEY)||'[]');
+    return Array.isArray(raw)?raw.map(r=>({
+      year:parseInt(r.year)||0,
+      agente:str(r.agente).toUpperCase(),
+      budget:num(r.budget)
+    })).filter(r=>r.year>2000&&r.agente&&r.budget>=0):[];
+  }catch(e){return [];}
+}
+function saveBudgets(list){
+  localStorage.setItem(BUDGET_KEY,JSON.stringify((list||[]).sort((a,b)=>a.year-b.year||a.agente.localeCompare(b.agente,'it'))));
+}
+function periodMonthFactor(){
+  const perVal=(document.getElementById('f-per')||{}).value||'';
+  if(perVal.startsWith('q')) return 3/12;
+  if(perVal.startsWith('m')) return 1/12;
+  return 1;
+}
+function activeYears(){
+  const annoDa=parseInt((document.getElementById('f-da')||{}).value)||0;
+  const annoA=parseInt((document.getElementById('f-a')||{}).value)||0;
+  const years=[];
+  for(let y=annoDa;y<=annoA;y++) years.push(y);
+  return years;
+}
+function getActiveBudgetEntries(filteredAgent=''){
+  const years=activeYears();
+  const factor=periodMonthFactor();
+  return (G.budgets||[])
+    .filter(r=>years.includes(r.year) && (!filteredAgent || r.agente===filteredAgent))
+    .map(r=>({...r,budgetActive:r.budget*factor}));
+}
+function getActiveBudgetMap(filteredAgent=''){
+  const out={};
+  getActiveBudgetEntries(filteredAgent).forEach(r=>{out[r.agente]=(out[r.agente]||0)+r.budgetActive;});
+  return out;
+}
+function upsertBudget(year,agente,budget){
+  const rows=loadBudgets();
+  const y=parseInt(year)||0,a=str(agente).toUpperCase(),b=num(budget);
+  if(!y||!a) return;
+  const idx=rows.findIndex(r=>r.year===y&&r.agente===a);
+  if(idx>=0) rows[idx].budget=b; else rows.push({year:y,agente:a,budget:b});
+  saveBudgets(rows);
+  G.budgets=rows;
+}
+function deleteBudget(year,agente){
+  const y=parseInt(year)||0,a=str(agente).toUpperCase();
+  const rows=loadBudgets().filter(r=>!(r.year===y&&r.agente===a));
+  saveBudgets(rows);
+  G.budgets=rows;
+}
+function seedBudgetAgentSelect(){
+  const sel=document.getElementById('bud-agent');
+  if(!sel) return;
+  const curr=sel.value;
+  const names=[...new Set([...(G.agenti||[]),...(G.budgets||[]).map(r=>r.agente)])].filter(Boolean).sort();
+  sel.innerHTML='<option value="">Seleziona agente esistente</option>';
+  names.forEach(n=>sel.insertAdjacentHTML('beforeend',`<option value="${n}">${n}</option>`));
+  if(names.includes(curr)) sel.value=curr;
+}
+function renderBudgetManager(){
+  const ySel=document.getElementById('bud-year');
+  if(!ySel) return;
+  const years=[...new Set([...(G.anni||[]),...(G.budgets||[]).map(r=>r.year)])].sort((a,b)=>a-b);
+  ySel.innerHTML='';
+  years.forEach(y=>ySel.insertAdjacentHTML('beforeend',`<option value="${y}">${y}</option>`));
+  if(!ySel.value && years.length) ySel.value=years[years.length-1];
+  seedBudgetAgentSelect();
+  const y=parseInt(ySel.value)||years[years.length-1]||new Date().getFullYear();
+  const rows=(G.budgets||[]).filter(r=>r.year===y).sort((a,b)=>b.budget-a.budget||a.agente.localeCompare(b.agente,'it'));
+  tbl('tbl-budget',['Anno','Agente/Commerciale','Budget','Azioni'],
+    rows.map(r=>[
+      `<span class="mono">${r.year}</span>`,
+      r.agente,
+      `<span class="mono">${fmt(r.budget)}</span>`,
+      `<button class="bsm" onclick="loadBudgetIntoForm(${r.year},'${r.agente.replace(/'/g,"\\'")}')">Modifica</button> <button class="bsm" onclick="removeBudget(${r.year},'${r.agente.replace(/'/g,"\\'")}')">Elimina</button>`
+    ])
+  );
+  const total=rows.reduce((a,r)=>a+r.budget,0);
+  const el=document.getElementById('budget-total');
+  if(el) el.textContent=`Budget anno ${y}: ${fmt(total)} · ${rows.length} voci`;
+}
+function loadBudgetIntoForm(year,agente){
+  document.getElementById('bud-year').value=year;
+  if([...(document.getElementById('bud-agent').options||[])].some(o=>o.value===agente)) document.getElementById('bud-agent').value=agente;
+  else document.getElementById('bud-agent-new').value=agente;
+  const row=(G.budgets||[]).find(r=>r.year===parseInt(year)&&r.agente===agente);
+  document.getElementById('bud-value').value=row?Math.round(row.budget):'';
+}
+function saveBudgetFromForm(){
+  const year=parseInt(document.getElementById('bud-year').value)||0;
+  const existing=document.getElementById('bud-agent').value;
+  const custom=document.getElementById('bud-agent-new').value;
+  const agente=str(existing||custom).toUpperCase();
+  const budget=num(document.getElementById('bud-value').value);
+  if(!year||!agente){alert('Inserisci anno e nome commerciale.');return;}
+  upsertBudget(year,agente,budget);
+  document.getElementById('bud-agent').value='';
+  document.getElementById('bud-agent-new').value='';
+  document.getElementById('bud-value').value='';
+  renderBudgetManager();
+  renderAll();
+}
+function removeBudget(year,agente){
+  deleteBudget(year,agente);
+  renderBudgetManager();
+  renderAll();
 }
 
 // ── FILE UPLOAD
@@ -219,7 +333,8 @@ function processData(vRaw,oRaw,lRaw){
   cliSel.innerHTML='';
   topCli.forEach(c=>cliSel.insertAdjacentHTML('beforeend',`<option value="${c}">${c}</option>`));
 
-  G={VEND,RESI,ORDINI,anni,agenti,listinoMap,CV};
+  G={VEND,RESI,ORDINI,anni,agenti,listinoMap,CV,budgets:loadBudgets()};
+  renderBudgetManager();
   applyFilters();
 }
 
@@ -277,9 +392,14 @@ function renderOverview(){
   const sMed=sR.length?avg(sR,r=>r.sconto):null;
   const over60=sR.filter(r=>r.sconto>SCONTO_MAX);
   document.getElementById('ov-sub').textContent=`${F.label} · ${V.length.toLocaleString('it')} righe vendita`;
+  const budgetMap=getActiveBudgetMap();
+  const budgetTot=Object.values(budgetMap).reduce((a,b)=>a+b,0);
+  const budDelta=budgetTot>0?(fattTot-budgetTot)/budgetTot:null;
   kpi('kr-ov',[
     {l:'Fatturato Periodo',v:fmt(fattTot),col:'g',sub:F.label},
     {l:`Fatturato ${aF}`,v:fmt(fCur),col:'g',delta,sub:`vs ${aF-1}`},
+    {l:'Budget Periodo',v:budgetTot?fmt(budgetTot):'—',col:'b',sub:budgetTot?`${Object.keys(budgetMap).length} commerciali`:'nessun budget'},
+    {l:'Scostamento vs Budget',v:budgetTot?fmt(fattTot-budgetTot):'—',col:budDelta!==null&&budDelta<0?'r':'g',sub:budDelta!==null?pct(Math.abs(budDelta))+(budDelta>=0?' sopra':' sotto'):'—'},
     {l:'Spese Trasporto',v:fmt(traspTot),col:'p',sub:pct(fattTot>0?traspTot/fattTot:0)+' del fatturato'},
     {l:'Sconto Medio',v:sMed!==null?pct(sMed):'N/D',col:sMed>SCONTO_MAX?'r':'g',sub:'su articoli listino'},
     {l:'Righe >60%',v:over60.length.toLocaleString('it'),col:over60.length>0?'r':'g',sub:'oltre soglia'},
@@ -470,33 +590,70 @@ function filterCliTbl(){
 
 function renderAgenti(){
   const V=F.vend,C=tc();
-  // Filtra agenti validi (non vuoti, non numerici)
+  const budgetMap=getActiveBudgetMap();
   const VwAgt=V.filter(r=>r.agente&&r.agente.length>1);
   const agtF=groupBy(VwAgt,r=>r.agente,rows=>({f:sum(rows,r=>r.importo),n:rows.length,tr:sum(rows,r=>r.trasp)}));
-  const sorted=Object.entries(agtF).sort((a,b)=>b[1].f-a[1].f);
-  const totF=sum(V,r=>r.importo);
-  kpi('kr-agt',sorted.slice(0,4).map(([k,v],i)=>({l:`#${i+1} ${k}`,v:fmt(v.f),col:['g','b','a','p'][i]||'p',sub:`${pct(totF>0?v.f/totF:0)} del totale`})));
-  const colors=[C.green+'bb',C.blue+'bb',C.amber+'bb',C.purple+'bb',C.red+'bb',C.cyan+'bb'];
-  doHBar('ch-agt-bar',sorted.map(([k])=>k),sorted.map(([,v])=>v.f),null,sorted.map((_,i)=>colors[i%colors.length]));
-  const anni=G.anni;
+  const names=[...new Set([...Object.keys(agtF),...Object.keys(budgetMap)])].sort((a,b)=>(agtF[b]?.f||0)-(agtF[a]?.f||0)||a.localeCompare(b,'it'));
+  const rows=names.map(k=>{
+    const actual=agtF[k]?.f||0, budget=budgetMap[k]||0, n=agtF[k]?.n||0, tr=agtF[k]?.tr||0;
+    const delta=actual-budget, attain=budget>0?actual/budget:null;
+    return {agente:k,actual,budget,delta,attain,n,tr};
+  }).sort((a,b)=>b.actual-a.actual||b.budget-a.budget||a.agente.localeCompare(b.agente,'it'));
+  const totF=sum(V,r=>r.importo), budgetTot=rows.reduce((a,r)=>a+r.budget,0);
+  const attainTot=budgetTot>0?totF/budgetTot:null;
+  kpi('kr-agt',[
+    {l:'Fatturato Totale',v:fmt(totF),col:'g',sub:`${rows.length} commerciali`},
+    {l:'Budget Totale',v:budgetTot?fmt(budgetTot):'—',col:'b',sub:budgetTot?'periodo filtrato':'nessun budget'},
+    {l:'Scostamento',v:budgetTot?fmt(totF-budgetTot):'—',col:budgetTot&&totF<budgetTot?'r':'g',sub:attainTot!==null?pct(Math.abs(attainTot-1))+(attainTot>=1?' sopra':' sotto'):'—'},
+    {l:'Raggiungimento',v:attainTot!==null?pct(attainTot):'—',col:attainTot!==null&&attainTot<1?'a':'g',sub:'fatturato / budget'},
+  ]);
+  dc('ch-agt-bar');
+  charts['ch-agt-bar']=new Chart(document.getElementById('ch-agt-bar').getContext('2d'),{
+    data:{labels:rows.map(r=>r.agente),datasets:[
+      {type:'bar',label:'Fatturato',data:rows.map(r=>r.actual),backgroundColor:C.green+'bb',borderRadius:4},
+      {type:'bar',label:'Budget',data:rows.map(r=>r.budget),backgroundColor:C.blue+'88',borderRadius:4}
+    ]},
+    options:{...chartOpts({legend:true,callbackY:v=>fmtS(v),C})}
+  });
+  const anni=[...new Set([...(G.anni||[]),...(G.budgets||[]).map(r=>r.year)])].sort((a,b)=>a-b);
+  const colors=[C.green,C.blue,C.amber,C.purple,C.red,C.cyan];
   dc('ch-agt-evol');
   charts['ch-agt-evol']=new Chart(document.getElementById('ch-agt-evol').getContext('2d'),{
-    data:{labels:anni,datasets:sorted.map(([k],i)=>({type:'line',label:k,
-      data:anni.map(a=>sum(G.VEND.filter(r=>r.anno===a&&r.agente===k),r=>r.importo)),
-      borderColor:colors[i%colors.length].replace('bb',''),tension:.3,pointRadius:3,fill:false}))},
+    data:{labels:anni,datasets:rows.slice(0,6).flatMap((r,i)=>([
+      {type:'line',label:`${r.agente} fatt.`,data:anni.map(a=>sum(G.VEND.filter(x=>x.anno===a&&x.agente===r.agente),x=>x.importo)),
+      borderColor:colors[i%colors.length],tension:.3,pointRadius:3,fill:false},
+      {type:'line',label:`${r.agente} budget`,data:anni.map(a=>(G.budgets||[]).filter(x=>x.year===a&&x.agente===r.agente).reduce((s,x)=>s+x.budget,0)),
+      borderColor:colors[i%colors.length],borderDash:[6,4],tension:.3,pointRadius:2,fill:false}
+    ]))},
     options:{...chartOpts({legend:true,callbackY:v=>fmtS(v),C})}
   });
   const agEl=document.getElementById('agr');agEl.innerHTML='';
-  const maxF=sorted[0]?.[1]?.f||1;
-  sorted.forEach(([k,v],i)=>{
+  const maxBase=Math.max(1,...rows.map(r=>Math.max(r.actual,r.budget,1)));
+  rows.forEach((r,i)=>{
+    const tone=r.budget>0&&r.actual<r.budget?'ba':'bg';
     agEl.insertAdjacentHTML('beforeend',`
       <div class="agrow"><div class="agrow-top">
         <span class="agno">${String(i+1).padStart(2,'0')}</span>
-        <span class="agname">${k}</span>
-        <span class="agval">${fmt(v.f)}</span>
-        <span class="bdg bg" style="font-size:8px">${pct(totF>0?v.f/totF:0)}</span>
-      </div><div class="agbar"><div class="agfill" style="width:${Math.round(v.f/maxF*100)}%"></div></div></div>`);
+        <span class="agname">${r.agente}</span>
+        <span class="agval">${fmt(r.actual)}</span>
+        <span class="bdg bb" style="font-size:8px">B ${r.budget?fmtS(r.budget):'—'}</span>
+        <span class="bdg ${tone}" style="font-size:8px">${r.attain!==null?pct(r.attain):'—'}</span>
+      </div>
+      <div class="agbar"><div class="agfill" style="width:${Math.round(Math.max(r.actual,r.budget)/maxBase*100)}%"></div></div>
+      </div>`);
   });
+  tbl('tbl-agt-report',['Agente','Fatturato','Budget','Scostamento','Raggiungimento','Righe','Trasporto'],
+    rows.map(r=>[
+      r.agente,
+      `<span class="mono">${fmt(r.actual)}</span>`,
+      r.budget?`<span class="mono">${fmt(r.budget)}</span>`:'—',
+      r.budget?`<span class="mono">${fmt(r.delta)}</span>`:'—',
+      r.attain!==null?`<span class="bdg ${r.attain<1?'ba':'bg'}">${pct(r.attain)}</span>`:'—',
+      `<span class="mono">${r.n}</span>`,
+      `<span class="mono">${fmt(r.tr)}</span>`
+    ])
+  );
+  renderBudgetManager();
 }
 
 let scontiData=[];
@@ -718,7 +875,11 @@ function renderCriticita(){
   if(scaduti.length)alerts.push({type:'danger',icon:'⏰',t:`${scaduti.length} ordini scaduti — €${fmtS(sum(scaduti,r=>r.importoI))}`,
     b:`Clienti: ${[...new Set(scaduti.map(r=>r.cliente).filter(Boolean))].slice(0,4).join(', ')}`});
   if(in30.length)alerts.push({type:'warn',icon:'📅',t:`${in30.length} ordini in scadenza 30gg — €${fmtS(sum(in30,r=>r.importoI))}`,b:'Pianificare priorità logistica.'});
-  const cliF=groupBy(V.filter(r=>r.anno>=2024),r=>r.cliente,rows=>sum(rows,r=>r.importo));
+  const budgetMap=getActiveBudgetMap();
+  const budgetRows=Object.entries(budgetMap).map(([agente,budget])=>({agente,budget,actual:sum(F.vend.filter(r=>r.agente===agente),r=>r.importo)})).filter(r=>r.budget>0);
+  const lowBudget=budgetRows.filter(r=>r.actual/r.budget<0.8).sort((a,b)=>(a.actual/a.budget)-(b.actual/b.budget));
+  if(lowBudget.length) alerts.push({type:'warn',icon:'🎯',t:`${lowBudget.length} commerciali sotto budget`,b:lowBudget.slice(0,4).map(r=>`${r.agente} ${pct(r.actual/r.budget)}`).join(' · ')});
+    const cliF=groupBy(V.filter(r=>r.anno>=2024),r=>r.cliente,rows=>sum(rows,r=>r.importo));
   const fTot2425=sum(V.filter(r=>r.anno>=2024),r=>r.importo);
   const top3=Object.entries(cliF).sort((a,b)=>b[1]-a[1]).slice(0,3);
   const top3pct=fTot2425>0?sum(top3,([,v])=>v)/fTot2425:0;
@@ -784,9 +945,10 @@ function sortTbl(id,col){
   sortState[id]={col,asc:s.col===col?!s.asc:true};
   const map={'tbl-cat':'vendite','tbl-drill':'vendite','tbl-cli':'clienti',
     'tbl-sc':'sconti','tbl-over60-cli':'sconti','tbl-marg':'margine',
-    'tbl-tr':'trasporti','tbl-tr-reg':'trasporti','tbl-tr-agt':'trasporti','tbl-ord':'ordini'};
+    'tbl-tr':'trasporti','tbl-tr-reg':'trasporti','tbl-tr-agt':'trasporti','tbl-ord':'ordini','tbl-agt-report':'agenti','tbl-budget':'agenti'};
   if(map[id]==='vendite')renderVendite();
   else if(map[id]==='clienti')filterCliTbl();
+  else if(map[id]==='agenti')renderAgenti();
   else if(map[id]==='sconti')renderScontiTbl();
   else if(map[id]==='margine')renderMargine();
   else if(map[id]==='trasporti')renderTrasporti();

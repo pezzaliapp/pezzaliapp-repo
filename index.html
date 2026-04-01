@@ -239,6 +239,11 @@ tbody td{padding:7px 10px;vertical-align:middle}
   .tb-brand{width:auto;border-right:none}
   .kr{grid-template-columns:repeat(2,1fr)}
 }
+
+.bform{display:grid;grid-template-columns:120px 1fr 1fr 160px auto;gap:8px;align-items:end}
+.bsub{font-size:9px;color:var(--text2);font-family:'JetBrains Mono',monospace;margin:6px 0 10px}
+@media(max-width:900px){.bform{grid-template-columns:1fr 1fr}.bform .full{grid-column:1/-1}}
+
 @media print{
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   body{display:block!important;background:#fff!important;color:#000!important}
@@ -322,7 +327,7 @@ tbody td{padding:7px 10px;vertical-align:middle}
     <span class="ic">⚠️</span>Criticità
     <span class="nbadge" id="nbadge">—</span>
   </div>
-  <div class="sb-foot">PezzaliApp · Cormach Srl<br>Dashboard v3.0 · 2026<br><span style="color:var(--green)">●</span> locale</div>
+  <div class="sb-foot">PezzaliApp · Cormach Srl<br>Dashboard v3.1 · 2026<br><span style="color:var(--green)">●</span> locale</div>
 </nav>
 
 <main class="main" id="main">
@@ -423,13 +428,26 @@ tbody td{padding:7px 10px;vertical-align:middle}
 
 <!-- AGENTI -->
 <div class="panel" id="panel-agenti">
-  <div class="ptitle">Ranking Agenti</div><div class="psub">CABASSI · PEZZALI · MARABELLI · BRUNO e altri · performance per periodo</div>
+  <div class="ptitle">Agenti, Commerciali e Budget</div><div class="psub">agenti esistenti o nuovi · budget annuali integrati nei report</div>
   <div class="kr fa" id="kr-agt"></div>
-  <div class="cg c2 fa d1">
-    <div class="cc"><div class="cc-h"><div><div class="cc-t">Fatturato per Agente</div><div class="cc-s">periodo · quota %</div></div></div><div class="cw h260"><canvas id="ch-agt-bar"></canvas></div></div>
-    <div class="cc"><div class="cc-h"><div><div class="cc-t">Evoluzione per Anno</div><div class="cc-s">trend storico per agente</div></div></div><div class="cw h260"><canvas id="ch-agt-evol"></canvas></div></div>
+  <div class="cc fa d1">
+    <div class="cc-h"><div><div class="cc-t">Budget Commerciali</div><div class="cc-s">puoi aggiungere budget per agenti già presenti o nuovi nominativi</div></div><span class="cbadge cbadge-g" id="budget-total">—</span></div>
+    <div class="bsub">I budget vengono salvati localmente nel browser e ricalcolati automaticamente nei report del periodo filtrato.</div>
+    <div class="bform">
+      <select id="bud-year"></select>
+      <select id="bud-agent"></select>
+      <input type="text" id="bud-agent-new" placeholder="Nuovo commerciale"/>
+      <input type="text" id="bud-value" placeholder="Budget €"/>
+      <button class="bsm full" onclick="saveBudgetFromForm()">Salva budget</button>
+    </div>
+    <div class="tw" style="margin-top:10px"><table id="tbl-budget"></table></div>
   </div>
-  <div class="cc fa d2"><div class="cc-h"><div><div class="cc-t">Classifica Dettaglio</div></div></div><div class="agr" id="agr"></div></div>
+  <div class="cg c2 fa d2">
+    <div class="cc"><div class="cc-h"><div><div class="cc-t">Fatturato vs Budget</div><div class="cc-s">periodo filtrato · confronto per commerciale</div></div></div><div class="cw h260"><canvas id="ch-agt-bar"></canvas></div></div>
+    <div class="cc"><div class="cc-h"><div><div class="cc-t">Evoluzione per Anno</div><div class="cc-s">linea continua = fatturato · tratteggiata = budget</div></div></div><div class="cw h260"><canvas id="ch-agt-evol"></canvas></div></div>
+  </div>
+  <div class="cc fa d3"><div class="cc-h"><div><div class="cc-t">Classifica Dettaglio</div></div></div><div class="agr" id="agr"></div></div>
+  <div class="cc fa d3" style="margin-top:12px"><div class="cc-h"><div><div class="cc-t">Report Budget per Agente</div><div class="cc-s">integrato nei report e nella stampa</div></div></div><div class="tw"><table id="tbl-agt-report"></table></div></div>
 </div>
 
 <!-- SCONTI -->
@@ -510,7 +528,7 @@ tbody td{padding:7px 10px;vertical-align:middle}
 </div>
 </main>
 
-<script src="app.js"></script>
+<script src="app.js?v=3.1"></script>
 <script>
 (function(){
   const sys=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
