@@ -253,6 +253,29 @@ tbody td{padding:7px 10px;vertical-align:middle}
   .cw{height:160pt!important}
   @page{margin:1.5cm;size:A4 landscape}
 }
+
+  /* ─── BUDGET MODULE ─── */
+  .bg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:14px}
+  .bg-card{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:14px}
+  .bg-card h4{font-size:10px;font-weight:700;color:var(--green);margin-bottom:10px;letter-spacing:.6px;text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px}
+  .bf{margin-bottom:7px}
+  .bf label{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:2px}
+  .bf input{width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:"JetBrains Mono",monospace;font-size:11px;padding:4px 7px;border-radius:5px;outline:none;transition:border-color .15s}
+  .bf input:focus{border-color:var(--green)}
+  .bg-month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:6px}
+  .bg-month-grid .bf{margin-bottom:0}
+  .bg-month-grid .bf input{font-size:9px;padding:3px 4px}
+  .bsave{background:var(--green);color:#fff;font-family:"DM Sans",sans-serif;font-size:11px;font-weight:700;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;transition:opacity .15s}
+  .bsave:hover{opacity:.85}
+  .vpos{color:var(--green);font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700}
+  .vneg{color:var(--red);font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700}
+  .fb-ok{background:var(--green-bg);color:var(--green);border:1px solid rgba(0,184,148,.3);font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px}
+  .fb-warn{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(253,203,110,.3);font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px}
+  .fb-ko{background:var(--red-bg);color:var(--red);border:1px solid rgba(225,112,85,.3);font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px}
+  .fb-na{background:var(--bg3);color:var(--text3);font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px}
+  .pbar-wrap{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:5px}
+  .pbar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+
 </style>
 </head>
 <body>
@@ -317,6 +340,9 @@ tbody td{padding:7px 10px;vertical-align:middle}
   <div class="ni" onclick="go('margine')"><span class="ic">⚖️</span>Marginalità</div>
   <div class="ni" onclick="go('trasporti')"><span class="ic">🚚</span>Trasporti</div>
   <div class="ni" onclick="go('ordini')"><span class="ic">📋</span>Ordini Inevasi</div>
+  <div class="sb-sec">Budget &amp; KPI</div>
+  <div class="ni" onclick="go('budget')"><span class="ic">🎯</span>Budget vs Fatturato</div>
+  <div class="ni" onclick="go('report-vendite')"><span class="ic">📑</span>Report Vendite</div>
   <div class="sb-sec">Alert</div>
   <div class="ni" onclick="go('criticita')">
     <span class="ic">⚠️</span>Criticità
@@ -508,6 +534,166 @@ tbody td{padding:7px 10px;vertical-align:middle}
   <div class="ptitle">Criticità & Alert</div><div class="psub">anomalie rilevate automaticamente</div>
   <div class="alerts fa" id="alerts"></div>
 </div>
+
+<!-- BUDGET VS FATTURATO -->
+<div class="panel" id="panel-budget">
+  <div class="ptitle">Budget vs Fatturato</div>
+  <div class="psub">budget annuo e mensile per agente · scostamento · YoY · forecast fine anno · dati salvati nel browser</div>
+
+  <!-- Toolbar -->
+  <div class="cc fa" style="margin-bottom:12px">
+    <div class="cc-h" style="flex-wrap:wrap;gap:8px">
+      <div><div class="cc-t">📥 Inserimento Budget</div>
+        <div class="cc-s">seleziona anno · inserisci budget annuo (distribuzione auto) o mensile manuale</div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="bg-year" onchange="onBgYearChange()" style="font-size:11px"></select>
+        <button class="bsave" onclick="saveBudget()">💾 Salva</button>
+        <button class="bsm" onclick="document.getElementById('bg-csv').click()">📂 CSV</button>
+        <input type="file" id="bg-csv" accept=".csv" style="display:none" onchange="importBgCSV(event)"/>
+        <span style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace">CSV: Agente,Annuo,Gen,...,Dic</span>
+      </div>
+    </div>
+    <div class="bg-grid" id="bg-input-grid">
+      <div style="color:var(--text2);font-size:11px;grid-column:1/-1;padding:8px">
+        Carica prima i file vendite per vedere gli agenti.
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kr fa d1" id="kr-budget"></div>
+
+  <!-- Charts -->
+  <div class="cg c2 fa d2">
+    <div class="cc">
+      <div class="cc-h"><div>
+        <div class="cc-t">Budget vs Fatturato Reale per Agente</div>
+        <div class="cc-s">verde = sopra budget · rosso = sotto · barra amber = forecast</div>
+      </div></div>
+      <div class="cw h300"><canvas id="ch-bg-bar"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div>
+        <div class="cc-t">Cumulato Mensile — Reale vs Budget vs Anno Prec.</div>
+        <div class="cc-s">linea verde = reale · blu tratteggiata = budget · grigia = anno precedente</div>
+      </div></div>
+      <div class="cw h300"><canvas id="ch-bg-cumul"></canvas></div>
+    </div>
+  </div>
+
+  <!-- YoY chart -->
+  <div class="cc fa d3" style="margin-bottom:12px">
+    <div class="cc-h">
+      <div>
+        <div class="cc-t">YoY Mensile — Anno Corrente vs Anno Precedente</div>
+        <div class="cc-s">barre = anno corrente (verde sopra budget · rosso sotto) · linea = anno prec. · tratteggio = budget</div>
+      </div>
+      <select id="bg-agt-yoy" onchange="renderBgYoY()" style="font-size:10px">
+        <option value="">Tutti gli agenti</option>
+      </select>
+    </div>
+    <div class="cw h250"><canvas id="ch-bg-yoy"></canvas></div>
+  </div>
+
+  <!-- KPI Table -->
+  <div class="cc fa d3" style="margin-bottom:12px">
+    <div class="cc-h"><div>
+      <div class="cc-t">📊 KPI per Agente — Scostamento · YoY · Forecast</div>
+      <div class="cc-s">clicca intestazione per ordinare · verde ON TRACK ≥105% · arancio AT RISK 90-105% · rosso OFF TRACK</div>
+    </div></div>
+    <div class="tw"><table id="tbl-bg"></table></div>
+  </div>
+
+  <!-- Monthly detail -->
+  <div class="cc fa d3">
+    <div class="cc-h">
+      <div><div class="cc-t">Dettaglio Mensile Agente</div>
+        <div class="cc-s">budget · reale · variance · YoY · mese corrente evidenziato</div></div>
+      <select id="bg-agt-monthly" onchange="renderBgMonthly()" style="font-size:10px">
+        <option value="">— Seleziona agente —</option>
+      </select>
+    </div>
+    <div class="tw"><table id="tbl-bg-monthly"></table></div>
+  </div>
+</div>
+
+
+<!-- REPORT VENDITE -->
+<div class="panel" id="panel-report-vendite">
+  <div class="ptitle">Report Vendite</div>
+  <div class="psub">vista consolidata per commerciale · periodo · categoria · confronto budget · pronto per la stampa</div>
+
+  <!-- Filtri report -->
+  <div class="cc fa" style="margin-bottom:12px">
+    <div class="cc-h" style="flex-wrap:wrap;gap:8px">
+      <div><div class="cc-t">⚙️ Parametri Report</div>
+           <div class="cc-s">seleziona periodo e granularità · usa 🖨️ per stampare</div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="rv-anno" onchange="renderReportVendite()" style="font-size:11px"></select>
+        <select id="rv-granul" onchange="renderReportVendite()" style="font-size:11px">
+          <option value="m">Mensile</option>
+          <option value="q">Trimestrale</option>
+          <option value="a">Annuale</option>
+        </select>
+        <select id="rv-metric" onchange="renderReportVendite()" style="font-size:11px">
+          <option value="f">Fatturato</option>
+          <option value="n">N° Righe</option>
+          <option value="sc">Sconto Medio</option>
+        </select>
+        <button class="bsm" onclick="window.print()">🖨️ Stampa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI summary -->
+  <div class="kr fa d1" id="kr-rv"></div>
+
+  <!-- Matrice agente × periodo -->
+  <div class="cc fa d2" style="margin-bottom:12px">
+    <div class="cc-h"><div>
+      <div class="cc-t">Matrice Fatturato — Agente × Periodo</div>
+      <div class="cc-s">ogni cella = fatturato del periodo · verde = sopra media · rosso = sotto</div>
+    </div></div>
+    <div class="tw"><table id="tbl-rv-matrix"></table></div>
+  </div>
+
+  <!-- Andamento per agente (stacked area) -->
+  <div class="cg c2 fa d2">
+    <div class="cc">
+      <div class="cc-h"><div>
+        <div class="cc-t">Andamento per Agente</div>
+        <div class="cc-s">contributo di ogni agente nel tempo</div>
+      </div></div>
+      <div class="cw h280"><canvas id="ch-rv-stacked"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h"><div>
+        <div class="cc-t">Mix Fatturato per Categoria</div>
+        <div class="cc-s">anno selezionato</div>
+      </div></div>
+      <div class="cw h280"><canvas id="ch-rv-cat"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Budget vs Reale per agente nel periodo -->
+  <div class="cc fa d3" style="margin-bottom:12px">
+    <div class="cc-h"><div>
+      <div class="cc-t">Performance vs Budget — Tutti gli Agenti</div>
+      <div class="cc-s">barre blu = budget · verde/rosso = reale · amber = forecast</div>
+    </div></div>
+    <div class="cw h260"><canvas id="ch-rv-bvr"></canvas></div>
+  </div>
+
+  <!-- Tabella riepilogativa completa -->
+  <div class="cc fa d3">
+    <div class="cc-h"><div>
+      <div class="cc-t">📋 Tabella Riepilogativa Completa per Commerciale</div>
+      <div class="cc-s">fatturato · budget · scostamento · YoY · KPI colorati · clicca intestazione per ordinare</div>
+    </div></div>
+    <div class="tw"><table id="tbl-rv-full"></table></div>
+  </div>
+</div>
+
 </main>
 
 <script src="app.js"></script>

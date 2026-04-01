@@ -259,8 +259,8 @@ function applyFilters(){
   renderAll();
 }
 function toggleCompare(){CMP=!CMP;document.getElementById('chip-cmp').classList.toggle('on',CMP);document.getElementById('f-cmp-a').style.display=CMP?'inline-block':'none';applyFilters();}
-function renderAll(){renderOverview();renderTrend();renderVendite();renderClienti();renderAgenti();renderSconti();renderMargine();renderTrasporti();renderOrdini();renderCriticita();}
-function initDashboard(){renderAll();go('overview');}
+function renderAll(){renderOverview();renderTrend();renderVendite();renderClienti();renderAgenti();renderSconti();renderMargine();renderTrasporti();renderOrdini();renderCriticita();renderBudget();renderReportVendite();}
+function initDashboard(){renderAll();initBgSelects();initRvSelects();go('overview');}
 
 // ═══════════════════════════════════════════════════════
 //  RENDERERS
@@ -784,13 +784,17 @@ function sortTbl(id,col){
   sortState[id]={col,asc:s.col===col?!s.asc:true};
   const map={'tbl-cat':'vendite','tbl-drill':'vendite','tbl-cli':'clienti',
     'tbl-sc':'sconti','tbl-over60-cli':'sconti','tbl-marg':'margine',
-    'tbl-tr':'trasporti','tbl-tr-reg':'trasporti','tbl-tr-agt':'trasporti','tbl-ord':'ordini'};
+    'tbl-tr':'trasporti','tbl-tr-reg':'trasporti','tbl-tr-agt':'trasporti','tbl-ord':'ordini',
+    'tbl-bg':'budget','tbl-bg-monthly':'budget',
+    'tbl-rv-matrix':'report-vendite','tbl-rv-full':'report-vendite'};
   if(map[id]==='vendite')renderVendite();
   else if(map[id]==='clienti')filterCliTbl();
   else if(map[id]==='sconti')renderScontiTbl();
   else if(map[id]==='margine')renderMargine();
   else if(map[id]==='trasporti')renderTrasporti();
   else if(map[id]==='ordini')filterOrdTbl();
+  else if(map[id]==='budget'){renderBgKpiTable();renderBgMonthly();}
+  else if(map[id]==='report-vendite'){renderReportVendite();}
 }
 function sh(s){return String(s).replace(/<[^>]+>/g,'').trim();}
 
@@ -835,3 +839,742 @@ function groupBy(arr,kFn,vFn){
   if(vFn)Object.keys(r).forEach(k=>{r[k]=vFn(r[k]);});return r;
 }
 function trunc(s,n){return s&&s.length>n?s.slice(0,n-1)+'…':s||'';}
+
+// ═══════════════════════════════════════════════════════
+//  BUDGET VS FATTURATO — PezzaliApp v3
+// ═══════════════════════════════════════════════════════
+//  Struttura dati localStorage:
+//  pza-budget-v1 = {
+//    "2025": {
+//      "CABASSI": { annuo: 1500000, mensile: [120000, 110000, ...] },
+//      "PEZZALI":  { annuo:  800000, mensile: [...] },
+//      ...
+//    }
+//  }
+// ═══════════════════════════════════════════════════════
+
+const BG_KEY = 'pza-budget-v1';
+
+// ── Storage helpers
+function bgLoad() {
+  try { return JSON.parse(localStorage.getItem(BG_KEY)||'{}'); }
+  catch(e) { return {}; }
+}
+function bgSave(store) {
+  localStorage.setItem(BG_KEY, JSON.stringify(store));
+}
+function bgGet(anno, agente) {
+  return (bgLoad()[anno]||{})[agente] || { annuo:0, mensile:Array(12).fill(0) };
+}
+
+// ── Get agenti from live dataset (sorted)
+function bgAgenti() {
+  return [...new Set((G.VEND||[]).filter(r=>r.agente&&r.agente.length>1).map(r=>r.agente))].sort();
+}
+
+// ── Populate year + agent selects in budget panel
+function initBgSelects() {
+  const anni = G.anni || [];
+  if (!anni.length) return;
+
+  // Year select
+  const sel = document.getElementById('bg-year');
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = anni.map(a=>`<option value="${a}">${a}</option>`).join('');
+    sel.value = anni.includes(+prev) ? prev : String(anni[anni.length-1]);
+  }
+
+  // Agent selects (YoY chart + monthly table)
+  const agenti = bgAgenti();
+  ['bg-agt-yoy','bg-agt-monthly'].forEach(id=>{
+    const s = document.getElementById(id); if(!s) return;
+    const pv = s.value;
+    const placeholder = id.includes('yoy') ? 'Tutti gli agenti' : '— Seleziona agente —';
+    s.innerHTML = `<option value="">${placeholder}</option>`;
+    agenti.forEach(a=>s.insertAdjacentHTML('beforeend',`<option value="${a}">${a}</option>`));
+    if(agenti.includes(pv)) s.value=pv;
+  });
+}
+
+function onBgYearChange() {
+  buildBgInputGrid();
+  renderBudget();
+}
+
+// ── Build the per-agent input cards
+function buildBgInputGrid() {
+  const agenti = bgAgenti();
+  const anno   = document.getElementById('bg-year')?.value || '';
+  const store  = bgLoad();
+  const grid   = document.getElementById('bg-input-grid');
+  if (!grid) return;
+  if (!agenti.length) {
+    grid.innerHTML = '<div style="color:var(--text2);font-size:11px;grid-column:1/-1;padding:8px">Carica prima i file vendite per vedere gli agenti.</div>';
+    return;
+  }
+
+  grid.innerHTML = agenti.map(ag => {
+    const b = (store[anno]||{})[ag] || { annuo:0, mensile:Array(12).fill(0) };
+    const mInputs = MESI.map((m,i) => `
+      <div class="bf">
+        <label>${m}</label>
+        <input type="number" id="bg-${ag}-m${i}" value="${b.mensile[i]||''}"
+          min="0" step="1000" placeholder="0"
+          onchange="bgSyncAnnuo('${ag}')"/>
+      </div>`).join('');
+    return `
+    <div class="bg-card">
+      <h4>${ag}</h4>
+      <div class="bf">
+        <label>Budget Annuo €</label>
+        <input type="number" id="bg-${ag}-annuo" value="${b.annuo||''}"
+          min="0" step="10000" placeholder="es. 1500000"
+          onchange="bgDistribuisci('${ag}')"/>
+      </div>
+      <div class="bg-month-grid">${mInputs}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Distribuisce annuo equamente nei 12 mesi (solo mesi a 0)
+function bgDistribuisci(ag) {
+  const annuoEl = document.getElementById(`bg-${ag}-annuo`); if(!annuoEl) return;
+  const annuo = parseFloat(annuoEl.value)||0;
+  const base  = Math.round(annuo/12);
+  MESI.forEach((_,i)=>{
+    const el = document.getElementById(`bg-${ag}-m${i}`);
+    if(el) el.value = base || '';
+  });
+}
+
+// ── Ricalcola totale annuo dalla somma mesi
+function bgSyncAnnuo(ag) {
+  const tot = MESI.reduce((s,_,i)=>{
+    const el = document.getElementById(`bg-${ag}-m${i}`);
+    return s + (parseFloat(el?.value)||0);
+  }, 0);
+  const el = document.getElementById(`bg-${ag}-annuo`);
+  if(el) el.value = Math.round(tot) || '';
+}
+
+// ── Salva budget da form
+function saveBudget() {
+  const anno = document.getElementById('bg-year')?.value; if(!anno) return;
+  const agenti = bgAgenti();
+  const store  = bgLoad();
+  if(!store[anno]) store[anno]={};
+  agenti.forEach(ag=>{
+    const annuoEl = document.getElementById(`bg-${ag}-annuo`);
+    const mensile = MESI.map((_,i)=>parseFloat(document.getElementById(`bg-${ag}-m${i}`)?.value)||0);
+    store[anno][ag] = { annuo: parseFloat(annuoEl?.value)||0, mensile };
+  });
+  bgSave(store);
+  renderBudget();
+  const btn = document.querySelector('.bsave');
+  if(btn){btn.textContent='✅ Salvato!';setTimeout(()=>{btn.textContent='💾 Salva';},1600);}
+}
+
+// ── Importa da CSV
+// Formato: Agente,Annuo,Gen,Feb,Mar,Apr,Mag,Giu,Lug,Ago,Set,Ott,Nov,Dic
+function importBgCSV(evt) {
+  const file = evt.target.files[0]; if(!file) return;
+  Papa.parse(file,{
+    header:true, skipEmptyLines:true, dynamicTyping:true,
+    complete(result){
+      const anno = document.getElementById('bg-year')?.value; if(!anno) return;
+      const store = bgLoad();
+      if(!store[anno]) store[anno]={};
+      result.data.forEach(row=>{
+        const ag = str(row.Agente||row.agente||''); if(!ag) return;
+        const mensile = MESI.map(m=>parseFloat(row[m]||row[m.toLowerCase()]||0));
+        const annuo   = parseFloat(row.Annuo||row.annuo||mensile.reduce((a,b)=>a+b,0));
+        store[anno][ag]={annuo,mensile};
+      });
+      bgSave(store);
+      buildBgInputGrid();
+      renderBudget();
+    }
+  });
+  evt.target.value='';
+}
+
+// ═══════════════════════════════════════════════════════
+//  KPI CALCULATION ENGINE
+// ═══════════════════════════════════════════════════════
+function calcBgKPI(annoStr, agente) {
+  const anno     = parseInt(annoStr);
+  const today    = new Date();
+  const isCurrYr = today.getFullYear() === anno;
+  // Mese corrente: se anno corrente usa mese reale, altrimenti Dic (anno chiuso)
+  const meseIdx  = isCurrYr ? today.getMonth() : 11; // 0-based
+
+  const store    = bgLoad();
+  const budget   = (store[annoStr]||{})[agente] || {annuo:0, mensile:Array(12).fill(0)};
+  const hasBudget= budget.annuo>0 || budget.mensile.some(v=>v>0);
+
+  // Fatturato reale per ogni mese (anno corrente)
+  const rows     = (G.VEND||[]).filter(r=>r.anno===anno&&r.agente===agente);
+  const fMensile = MESI.map((_,i)=>sum(rows.filter(r=>r.mese===i),r=>r.importo));
+  const fAnnuo   = sum(fMensile,x=>x);
+
+  // YTD = somma mesi 0..meseIdx (incluso)
+  const fYtd     = sum(fMensile.slice(0,meseIdx+1),x=>x);
+  const bYtd     = budget.mensile.slice(0,meseIdx+1).reduce((a,b)=>a+b,0);
+
+  // Mese corrente
+  const fMese    = fMensile[meseIdx]||0;
+  const bMese    = budget.mensile[meseIdx]||0;
+
+  // Variance YTD
+  const vYtdAbs  = fYtd - bYtd;
+  const vYtdPct  = bYtd>0 ? vYtdAbs/bYtd : null;
+
+  // Variance mese
+  const vMeseAbs = fMese - bMese;
+  const vMesePct = bMese>0 ? vMeseAbs/bMese : null;
+
+  // YoY — stesso mese anno precedente
+  const rowsPrec = (G.VEND||[]).filter(r=>r.anno===anno-1&&r.agente===agente);
+  const fMensilePrec = MESI.map((_,i)=>sum(rowsPrec.filter(r=>r.mese===i),r=>r.importo));
+  const fMesePrec    = fMensilePrec[meseIdx]||0;
+  const fYtdPrec     = sum(fMensilePrec.slice(0,meseIdx+1),x=>x);
+  const yoyMeseAbs   = fMese - fMesePrec;
+  const yoyMesePct   = fMesePrec>0 ? yoyMeseAbs/fMesePrec : null;
+  const yoyYtdPct    = fYtdPrec>0  ? (fYtd-fYtdPrec)/fYtdPrec : null;
+
+  // Forecast fine anno (run-rate: media mensile YTD × 12)
+  const mesiTrasc    = meseIdx+1;
+  const runRate      = fYtd / mesiTrasc;
+  const forecast     = runRate * 12;
+  const foreVsBudPct = budget.annuo>0 ? (forecast-budget.annuo)/budget.annuo : null;
+  const foreRatio    = budget.annuo>0 ? forecast/budget.annuo : null;
+
+  // Stato semaforo
+  let stato = 'na'; // no budget
+  if(hasBudget){
+    if(foreRatio===null)      stato='na';
+    else if(foreRatio>=1.05)  stato='ok';    // ON TRACK
+    else if(foreRatio>=0.90)  stato='warn';  // AT RISK
+    else                       stato='ko';   // OFF TRACK
+  }
+
+  return {
+    agente, anno, hasBudget,
+    budget, fMensile, fMensilePrec, fAnnuo, fYtd, fMese,
+    bYtd, bMese, vYtdAbs, vYtdPct, vMeseAbs, vMesePct,
+    yoyMeseAbs, yoyMesePct, yoyYtdPct,
+    forecast, foreVsBudPct, foreRatio,
+    runRate, meseIdx, stato,
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER BUDGET PANEL (entry point)
+// ═══════════════════════════════════════════════════════
+function renderBudget() {
+  if(!G.VEND||!G.anni||!G.anni.length) return;
+  initBgSelects();
+  buildBgInputGrid();
+
+  const annoStr = document.getElementById('bg-year')?.value;
+  if(!annoStr) return;
+  const C = tc();
+
+  const agenti = bgAgenti();
+  const allKPI = agenti.map(ag=>calcBgKPI(annoStr,ag));
+
+  // ── Aggregate totals
+  const totF    = sum(allKPI,k=>k.fAnnuo);
+  const totYtd  = sum(allKPI,k=>k.fYtd);
+  const totBYtd = sum(allKPI.filter(k=>k.hasBudget),k=>k.bYtd);
+  const totBud  = sum(allKPI.filter(k=>k.hasBudget),k=>k.budget.annuo);
+  const totFore = sum(allKPI.filter(k=>k.hasBudget),k=>k.forecast);
+  const vYtdTot = totBYtd>0 ? (totYtd-totBYtd)/totBYtd : null;
+
+  // ── KPI Cards
+  kpi('kr-budget',[
+    {l:`Fatturato YTD ${annoStr}`,  v:fmt(totYtd), col:'g', sub:`Annuo: ${fmt(totF)}`},
+    {l:'Budget YTD',                v:fmt(totBYtd), col:'b', sub:totBud>0?`Annuo: ${fmt(totBud)}`:'Budget non inserito'},
+    {l:'Scostamento YTD',           v:vYtdTot!==null?pct(vYtdTot):'N/D',
+      col:vYtdTot===null?'p':vYtdTot>=0?'g':'r',
+      sub:vYtdTot!==null?`${vYtdTot>=0?'▲':' ▼'} ${fmt(Math.abs(totYtd-totBYtd))}`:undefined},
+    {l:'Forecast Fine Anno',        v:fmt(totFore), col:'a', sub:'run-rate × 12'},
+    {l:'Forecast vs Budget',        v:totBud>0?pct((totFore-totBud)/totBud):'N/D',
+      col:totBud>0&&totFore>=totBud?'g':'r', sub:'proiezione annua'},
+  ]);
+
+  // ── Chart: Budget vs Reale per agente (grouped bar)
+  renderBgBarChart(allKPI, annoStr, C);
+
+  // ── Chart: Cumulato mensile
+  renderBgCumulChart(allKPI, annoStr, C);
+
+  // ── YoY chart (uses its own select)
+  renderBgYoY();
+
+  // ── KPI table
+  renderBgKpiTable();
+
+  // ── Monthly table (uses its own select)
+  renderBgMonthly();
+}
+
+// ── Grouped bar: Budget / Reale / Forecast per agente
+function renderBgBarChart(allKPI, annoStr, C) {
+  if(!C) C=tc();
+  const withData = allKPI.filter(k=>k.hasBudget||k.fAnnuo>0);
+  if(!withData.length){dc('ch-bg-bar');return;}
+  dc('ch-bg-bar');
+  charts['ch-bg-bar'] = new Chart(document.getElementById('ch-bg-bar').getContext('2d'),{
+    type:'bar',
+    data:{
+      labels: withData.map(k=>k.agente),
+      datasets:[
+        {label:'Budget Annuo',   data:withData.map(k=>k.budget.annuo),
+          backgroundColor:C.blue+'55', borderRadius:3},
+        {label:'Fatturato Reale',data:withData.map(k=>k.fAnnuo),
+          backgroundColor:withData.map(k=>k.fAnnuo>=k.budget.annuo&&k.hasBudget?C.green+'aa':C.red+'aa'),
+          borderRadius:3},
+        {label:'Forecast',       data:withData.map(k=>k.hasBudget?k.forecast:0),
+          backgroundColor:C.amber+'55', borderColor:C.amber, borderWidth:1, borderRadius:3},
+      ]
+    },
+    options:{...chartOpts({legend:true,callbackY:v=>fmtS(v),C})}
+  });
+}
+
+// ── Cumulato mensile: Reale vs Budget vs Anno Prec
+function renderBgCumulChart(allKPI, annoStr, C) {
+  if(!C) C=tc();
+  const anno = parseInt(annoStr);
+  // Somma tutti gli agenti mese per mese
+  const fMens  = MESI.map((_,i)=>sum(allKPI,k=>k.fMensile[i]||0));
+  const bMens  = MESI.map((_,i)=>allKPI.reduce((s,k)=>s+(k.hasBudget?k.budget.mensile[i]:0),0));
+  const fPrec  = MESI.map((_,i)=>sum(allKPI,k=>k.fMensilePrec[i]||0));
+  const fCumul=[]; fMens.reduce((a,v,i)=>{fCumul[i]=a+v;return a+v;},0);
+  const bCumul=[]; bMens.reduce((a,v,i)=>{bCumul[i]=a+v;return a+v;},0);
+  const pCumul=[]; fPrec.reduce((a,v,i)=>{pCumul[i]=a+v;return a+v;},0);
+  dc('ch-bg-cumul');
+  charts['ch-bg-cumul'] = new Chart(document.getElementById('ch-bg-cumul').getContext('2d'),{
+    data:{labels:MESI,datasets:[
+      {type:'line',label:`Reale ${anno}`,    data:fCumul, borderColor:C.green,  tension:.3,pointRadius:4,fill:false},
+      {type:'line',label:'Budget',           data:bCumul, borderColor:C.blue,   borderDash:[6,4],pointRadius:0,fill:false},
+      {type:'line',label:`Reale ${anno-1}`,  data:pCumul, borderColor:C.text2,  tension:.3,pointRadius:3,fill:false,borderWidth:1.5},
+    ]},
+    options:{...chartOpts({legend:true,callbackY:v=>fmtS(v),C})}
+  });
+}
+
+// ── YoY mensile (barre anno corrente + linea anno prec + budget)
+function renderBgYoY() {
+  const annoStr = document.getElementById('bg-year')?.value; if(!annoStr) return;
+  const anno    = parseInt(annoStr);
+  const agente  = document.getElementById('bg-agt-yoy')?.value||'';
+  const C       = tc();
+  const filterR = r=>r.anno===anno    &&(agente?r.agente===agente:true);
+  const filterP = r=>r.anno===anno-1  &&(agente?r.agente===agente:true);
+  const fCurr   = MESI.map((_,i)=>sum((G.VEND||[]).filter(r=>filterR(r)&&r.mese===i),r=>r.importo));
+  const fPrec   = MESI.map((_,i)=>sum((G.VEND||[]).filter(r=>filterP(r)&&r.mese===i),r=>r.importo));
+  const store   = bgLoad();
+  const bMens   = MESI.map((_,i)=>{
+    if(agente) return (store[annoStr]?.[agente]?.mensile?.[i])||0;
+    return bgAgenti().reduce((s,ag)=>s+((store[annoStr]?.[ag]?.mensile?.[i])||0),0);
+  });
+  dc('ch-bg-yoy');
+  charts['ch-bg-yoy'] = new Chart(document.getElementById('ch-bg-yoy').getContext('2d'),{
+    data:{labels:MESI,datasets:[
+      {type:'bar',  label:`${anno}`,
+        data:fCurr,
+        backgroundColor:fCurr.map((v,i)=>bMens[i]>0?(v>=bMens[i]?C.green+'88':C.red+'88'):C.blue+'66'),
+        borderRadius:3},
+      {type:'line', label:`${anno-1}`,  data:fPrec,  borderColor:C.text2, tension:.3,pointRadius:3,fill:false},
+      {type:'line', label:'Budget',     data:bMens,  borderColor:C.amber, borderDash:[5,5],pointRadius:0,fill:false},
+    ]},
+    options:{...chartOpts({legend:true,callbackY:v=>fmtS(v),C})}
+  });
+}
+
+// ── KPI Table per agente
+function renderBgKpiTable() {
+  const annoStr = document.getElementById('bg-year')?.value; if(!annoStr) return;
+  const agenti  = bgAgenti();
+  const allKPI  = agenti.map(ag=>calcBgKPI(annoStr,ag));
+  const STATO_HTML = {
+    ok:  '<span class="fb-ok">✅ ON TRACK</span>',
+    warn:'<span class="fb-warn">⚠ AT RISK</span>',
+    ko:  '<span class="fb-ko">❌ OFF TRACK</span>',
+    na:  '<span class="fb-na">— N/B</span>',
+  };
+  tbl('tbl-bg',
+    ['Agente','Fatturato Reale','Budget Annuo','YTD Reale','YTD Budget','Var YTD %','Var YTD €','YoY Mese','Forecast','Fore vs Bud','Stato'],
+    allKPI.map(k=>[
+      `<strong>${k.agente}</strong>`,
+      `<span class="mono">${fmt(k.fAnnuo)}</span>`,
+      k.hasBudget?`<span class="mono">${fmt(k.budget.annuo)}</span>`:'<span style="color:var(--text3)">—</span>',
+      `<span class="mono">${fmt(k.fYtd)}</span>`,
+      k.hasBudget?`<span class="mono">${fmt(k.bYtd)}</span>`:'—',
+      k.vYtdPct!==null
+        ?`<span class="${k.vYtdPct>=0?'vpos':'vneg'}">${k.vYtdPct>=0?'▲':'▼'} ${pct(Math.abs(k.vYtdPct))}</span>`
+        :'<span style="color:var(--text3)">N/B</span>',
+      k.vYtdPct!==null
+        ?`<span class="${k.vYtdAbs>=0?'vpos':'vneg'}">${k.vYtdAbs>=0?'+':''}${fmt(k.vYtdAbs)}</span>`
+        :'—',
+      k.yoyMesePct!==null
+        ?`<span class="${k.yoyMesePct>=0?'vpos':'vneg'}">${k.yoyMesePct>=0?'▲':'▼'} ${pct(Math.abs(k.yoyMesePct))}</span>`
+        :'—',
+      k.hasBudget?`<span class="mono">${fmt(k.forecast)}</span>`:'—',
+      k.foreVsBudPct!==null
+        ?`<span class="${k.foreVsBudPct>=0?'vpos':'vneg'}">${k.foreVsBudPct>=0?'+':''}${pct(k.foreVsBudPct)}</span>`
+        :'—',
+      STATO_HTML[k.stato]||STATO_HTML['na'],
+    ])
+  );
+}
+
+// ── Dettaglio mensile per agente selezionato
+function renderBgMonthly() {
+  const annoStr = document.getElementById('bg-year')?.value;
+  const agente  = document.getElementById('bg-agt-monthly')?.value;
+  if(!annoStr||!agente){
+    tbl('tbl-bg-monthly',['—'],[['Seleziona un agente dal menu in alto']]);
+    return;
+  }
+  const k    = calcBgKPI(annoStr, agente);
+  const anno = parseInt(annoStr);
+  const rows = MESI.map((m,i)=>{
+    const reale  = k.fMensile[i]||0;
+    const budget = k.budget.mensile[i]||0;
+    const prec   = k.fMensilePrec[i]||0;
+    const vAbs   = reale - budget;
+    const vPct   = budget>0 ? vAbs/budget : null;
+    const yoy    = prec>0   ? (reale-prec)/prec : null;
+    const isCur  = i===k.meseIdx;
+    // progress bar fill %
+    const barPct = budget>0 ? Math.min(100,Math.round(reale/budget*100)) : 0;
+    const barCol = budget>0&&reale>=budget ? 'var(--green)' : budget>0 ? 'var(--red)' : 'var(--blue)';
+    return [
+      isCur ? `<strong style="color:var(--green)">${m} ◀</strong>` : m,
+      `<span class="mono">${fmt(reale)}</span>`,
+      budget>0 ? `<span class="mono">${fmt(budget)}</span>` : '<span style="color:var(--text3)">—</span>',
+      vPct!==null
+        ?`<span class="${vAbs>=0?'vpos':'vneg'}">${vAbs>=0?'+':''}${fmt(vAbs)}</span>`:'—',
+      vPct!==null
+        ?`<span class="${vPct>=0?'vpos':'vneg'}">${vPct>=0?'▲':'▼'} ${pct(Math.abs(vPct))}</span>`:'—',
+      `<span class="mono">${fmt(prec)}</span>`,
+      yoy!==null
+        ?`<span class="${yoy>=0?'vpos':'vneg'}">${yoy>=0?'▲':'▼'} ${pct(Math.abs(yoy))}</span>`:'—',
+      budget>0?`<div class="pbar-wrap"><div class="pbar-fill" style="width:${barPct}%;background:${barCol}"></div></div>${barPct}%`:'—',
+    ];
+  });
+  tbl('tbl-bg-monthly',
+    ['Mese','Reale','Budget','Var €','Var %','Anno Prec.','YoY %','Progress'],
+    rows
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+//  REPORT VENDITE — Matrice Agente × Periodo + KPI colorati
+// ═══════════════════════════════════════════════════════
+
+function initRvSelects() {
+  const anni = G.anni || [];
+  if (!anni.length) return;
+  const sel = document.getElementById('rv-anno');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = anni.map(a=>`<option value="${a}">${a}</option>`).join('');
+  sel.value = anni.includes(+prev) ? prev : String(anni[anni.length-1]);
+}
+
+function renderReportVendite() {
+  if (!G.VEND || !G.anni || !G.anni.length) return;
+  initRvSelects();
+
+  const annoStr = document.getElementById('rv-anno')?.value;
+  const granul  = document.getElementById('rv-granul')?.value || 'm';
+  const metric  = document.getElementById('rv-metric')?.value || 'f';
+  const anno    = parseInt(annoStr);
+  const C       = tc();
+
+  const agenti  = bgAgenti();
+  const V       = (G.VEND||[]).filter(r=>r.anno===anno);
+
+  // Periodi
+  let periodi, periodLabel, getIdx;
+  if (granul === 'm') {
+    periodi = MESI; periodLabel = m => m;
+    getIdx  = r => r.mese;
+  } else if (granul === 'q') {
+    periodi = QNAMES; periodLabel = q => q;
+    getIdx  = r => r.trim;
+  } else {
+    periodi = [String(anno)]; periodLabel = a => a;
+    getIdx  = () => 0;
+  }
+
+  // Metrica
+  const metricFn = r => metric==='f' ? r.importo : metric==='n' ? 1 : (r.sconto||0);
+  const metricLabel = {f:'Fatturato',n:'N° Righe',sc:'Sconto Medio'}[metric];
+  const metricFmt  = v => metric==='sc' ? pct(v) : metric==='f' ? fmt(v) : v.toLocaleString('it');
+
+  // ── KPI cards
+  const totF    = sum(V, r=>r.importo);
+  const totPrec = sum((G.VEND||[]).filter(r=>r.anno===anno-1), r=>r.importo);
+  const yoy     = totPrec>0 ? (totF-totPrec)/totPrec : null;
+  const nCli    = new Set(V.map(r=>r.cliente).filter(Boolean)).size;
+  const nRighe  = V.length;
+  const sMed    = V.filter(r=>r.sconto!==null).length
+    ? avg(V.filter(r=>r.sconto!==null),r=>r.sconto) : null;
+
+  kpi('kr-rv',[
+    {l:`Fatturato ${anno}`,  v:fmt(totF),    col:'g', sub:`vs ${anno-1}`, delta:yoy},
+    {l:'N° Clienti',         v:nCli,         col:'b', sub:'clienti distinti'},
+    {l:'N° Righe Vendita',   v:nRighe.toLocaleString('it'), col:'p'},
+    {l:'Sconto Medio',       v:sMed!==null?pct(sMed):'N/D', col:sMed>SCONTO_MAX?'r':'g', sub:'su articoli listino'},
+    {l:'Fatturato Anno Prec.',v:fmt(totPrec), col:'b', sub:String(anno-1)},
+  ]);
+
+  // ── Matrice Agente × Periodo
+  // Calcola valori per ogni cella [agente][periodo]
+  const matrix = {};
+  agenti.forEach(ag => {
+    matrix[ag] = periodi.map((_,pi) => {
+      const rows = V.filter(r=>r.agente===ag && getIdx(r)===pi);
+      if (metric==='sc') return rows.filter(r=>r.sconto!==null).length ? avg(rows.filter(r=>r.sconto!==null),r=>r.sconto) : 0;
+      return sum(rows, metricFn);
+    });
+  });
+
+  // Totali per periodo
+  const totPeriodo = periodi.map((_,pi)=>sum(agenti,ag=>matrix[ag]?.[pi]||0));
+  const totAgente  = agenti.map(ag=>sum(matrix[ag]||[],x=>x));
+  const grandTotal = sum(totAgente,x=>x);
+
+  // Media colonna per colorazione semaforo
+  const medPeriodo = periodi.map((_,pi) => {
+    const vals = agenti.map(ag=>matrix[ag]?.[pi]||0).filter(v=>v>0);
+    return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+  });
+
+  // Costruisci tabella matrice
+  const tdStyle = (val, avg) => {
+    if (!avg || metric==='sc') return '';
+    if (val >= avg*1.1)  return ' style="color:var(--green);font-weight:700"';
+    if (val >= avg*0.9)  return '';
+    return ' style="color:var(--red)"';
+  };
+
+  const headers = ['Agente', ...periodi.map(periodLabel), 'Totale', '%'];
+  const rows    = agenti.filter(ag=>totAgente[agenti.indexOf(ag)]>0).map(ag => {
+    const ai = agenti.indexOf(ag);
+    return [
+      `<strong>${ag}</strong>`,
+      ...periodi.map((_,pi) => {
+        const v = matrix[ag]?.[pi]||0;
+        return `<span class="mono"${tdStyle(v,medPeriodo[pi])}>${metricFmt(v)}</span>`;
+      }),
+      `<span class="mono" style="color:var(--text)">${metricFmt(totAgente[ai])}</span>`,
+      grandTotal>0 ? `<span class="bdg bg">${pct(totAgente[ai]/grandTotal)}</span>` : '—',
+    ];
+  });
+  // Aggiungi riga totale
+  rows.push([
+    '<em style="color:var(--text2)">TOTALE</em>',
+    ...totPeriodo.map(v=>`<span class="mono" style="font-weight:700">${metricFmt(v)}</span>`),
+    `<span class="mono" style="font-weight:700">${metricFmt(grandTotal)}</span>`,
+    '<span class="bdg bg">100%</span>',
+  ]);
+
+  tbl('tbl-rv-matrix', headers, rows);
+
+  // ── Stacked area chart: agente nel tempo
+  const AGT_COLORS = [C.green,C.blue,C.amber,C.purple,C.red,C.cyan];
+  dc('ch-rv-stacked');
+  if (agenti.length && periodi.length) {
+    charts['ch-rv-stacked'] = new Chart(document.getElementById('ch-rv-stacked').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: periodi.map(periodLabel),
+        datasets: agenti.filter(ag=>totAgente[agenti.indexOf(ag)]>0).map((ag,i) => ({
+          label: ag,
+          data: periodi.map((_,pi)=>matrix[ag]?.[pi]||0),
+          backgroundColor: AGT_COLORS[i%AGT_COLORS.length]+'aa',
+          borderRadius: 2,
+        }))
+      },
+      options: {
+        ...chartOpts({legend:true, callbackY:v=>fmtS(v), C}),
+        scales: {
+          ...chartOpts({C}).scales,
+          x: { ...chartOpts({C}).scales.x, stacked:true },
+          y: { ...chartOpts({C}).scales.y, stacked:true },
+        }
+      }
+    });
+  }
+
+  // ── Donut categorie
+  const catF = {};
+  V.filter(r=>r.cat&&r.cat.length>1).forEach(r=>{ catF[r.cat]=(catF[r.cat]||0)+r.importo; });
+  const catS = Object.entries(catF).sort((a,b)=>b[1]-a[1]).slice(0,9);
+  doPie('ch-rv-cat', catS.map(([k])=>k.split(' - ')[0]), catS.map(([,v])=>v));
+
+  // ── Budget vs Reale chart (replica da Budget panel con anno selezionato)
+  const allKPI = agenti.map(ag=>calcBgKPI(annoStr,ag));
+  renderBgBarChart(allKPI, annoStr, C);
+  // Ridisegna sul canvas del report (ch-rv-bvr)
+  const withData = allKPI.filter(k=>k.hasBudget||k.fAnnuo>0);
+  dc('ch-rv-bvr');
+  if (withData.length) {
+    charts['ch-rv-bvr'] = new Chart(document.getElementById('ch-rv-bvr').getContext('2d'),{
+      type:'bar',
+      data:{
+        labels: withData.map(k=>k.agente),
+        datasets:[
+          {label:'Budget Annuo',    data:withData.map(k=>k.budget.annuo),   backgroundColor:C.blue+'55',  borderRadius:3},
+          {label:'Fatturato Reale', data:withData.map(k=>k.fAnnuo),         backgroundColor:withData.map(k=>k.fAnnuo>=k.budget.annuo&&k.hasBudget?C.green+'aa':C.red+'88'), borderRadius:3},
+          {label:'Forecast',        data:withData.map(k=>k.hasBudget?k.forecast:0), backgroundColor:C.amber+'55', borderColor:C.amber, borderWidth:1, borderRadius:3},
+        ]
+      },
+      options:{...chartOpts({legend:true,callbackY:v=>fmtS(v),C})}
+    });
+  }
+
+  // ── Tabella riepilogativa completa con KPI colorati
+  const STATO = { ok:'<span class="fb-ok">✅ ON TRACK</span>', warn:'<span class="fb-warn">⚠ AT RISK</span>', ko:'<span class="fb-ko">❌ OFF TRACK</span>', na:'<span class="fb-na">—</span>' };
+  tbl('tbl-rv-full',
+    ['Commerciale','Fatturato','Budget','Scost. YTD','YoY','Righe','Clienti','Sconto Medio','Stato'],
+    agenti.map(ag => {
+      const kpiData = allKPI.find(k=>k.agente===ag) || {};
+      const rows    = V.filter(r=>r.agente===ag);
+      const fAg     = sum(rows,r=>r.importo);
+      const nRighe  = rows.length;
+      const nCli    = new Set(rows.map(r=>r.cliente).filter(Boolean)).size;
+      const sMed    = rows.filter(r=>r.sconto!==null).length ? avg(rows.filter(r=>r.sconto!==null),r=>r.sconto) : null;
+      const rowsPrec= (G.VEND||[]).filter(r=>r.anno===anno-1&&r.agente===ag);
+      const fPrec   = sum(rowsPrec,r=>r.importo);
+      const yoyAg   = fPrec>0 ? (fAg-fPrec)/fPrec : null;
+      return [
+        `<strong>${ag}</strong>`,
+        `<span class="mono">${fmt(fAg)}</span>`,
+        kpiData.hasBudget ? `<span class="mono">${fmt(kpiData.budget?.annuo||0)}</span>` : '<span style="color:var(--text3)">—</span>',
+        kpiData.vYtdPct!=null
+          ? `<span class="${kpiData.vYtdPct>=0?'vpos':'vneg'}">${kpiData.vYtdPct>=0?'▲':'▼'} ${pct(Math.abs(kpiData.vYtdPct))}</span>`
+          : '—',
+        yoyAg!=null
+          ? `<span class="${yoyAg>=0?'vpos':'vneg'}">${yoyAg>=0?'▲':'▼'} ${pct(Math.abs(yoyAg))}</span>`
+          : '—',
+        nRighe.toLocaleString('it'),
+        nCli,
+        sMed!=null ? `<span class="bdg ${sMed>SCONTO_MAX?'br':sMed>0.5?'ba':'bg'}">${pct(sMed)}</span>` : '—',
+        STATO[kpiData.stato||'na'],
+      ];
+    }).filter(r=>r[1]!==fmt(0)) // nascondi agenti senza fatturato
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT BUDGET CSV
+// ═══════════════════════════════════════════════════════
+function exportBudgetCSV() {
+  const anno   = document.getElementById('bg-year')?.value;
+  if (!anno) return;
+  const store  = bgLoad();
+  const agBudg = store[anno] || {};
+  const agenti = bgAgenti();
+  const headers = ['Agente','Annuo',...MESI];
+  const rows    = agenti.map(ag => {
+    const b = agBudg[ag] || {annuo:0,mensile:Array(12).fill(0)};
+    return [ag, b.annuo, ...b.mensile].join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download=`budget_${anno}_pezzaliapp.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════
+//  CRITICITÀ — estendi con alert budget
+// ═══════════════════════════════════════════════════════
+// Wrap renderCriticita to add budget alerts at the end
+const _origRenderCriticita = renderCriticita;
+function renderCriticita() {
+  _origRenderCriticita();
+
+  // Aggiungi alert budget se ci sono dati
+  if (!G.VEND || !G.anni || !G.anni.length) return;
+  const annoStr = String(G.anni[G.anni.length-1]);
+  const agenti  = bgAgenti();
+  if (!agenti.length) return;
+
+  const allKPI  = agenti.map(ag=>calcBgKPI(annoStr,ag));
+  const withBud = allKPI.filter(k=>k.hasBudget);
+  if (!withBud.length) return;
+
+  const offTrack = withBud.filter(k=>k.stato==='ko');
+  const atRisk   = withBud.filter(k=>k.stato==='warn');
+  const onTrack  = withBud.filter(k=>k.stato==='ok');
+
+  const budgetAlerts = [];
+  if (offTrack.length) {
+    budgetAlerts.push({
+      type:'danger', icon:'🎯',
+      t:`Budget ${annoStr}: ${offTrack.length} agente/i OFF TRACK`,
+      b:`${offTrack.map(k=>`${k.agente} (forecast ${pct(k.foreVsBudPct||0)} vs budget)`).join(' · ')}`,
+    });
+  }
+  if (atRisk.length) {
+    budgetAlerts.push({
+      type:'warn', icon:'⚠️',
+      t:`Budget ${annoStr}: ${atRisk.length} agente/i AT RISK`,
+      b:`${atRisk.map(k=>`${k.agente} (${pct(k.foreVsBudPct||0)} vs budget)`).join(' · ')}`,
+    });
+  }
+  if (onTrack.length && !offTrack.length && !atRisk.length) {
+    budgetAlerts.push({
+      type:'ok', icon:'🎯',
+      t:`Budget ${annoStr}: tutti gli agenti ON TRACK`,
+      b:onTrack.map(k=>`${k.agente} +${pct(k.foreVsBudPct||0)}`).join(' · '),
+    });
+  }
+
+  if (!budgetAlerts.length) return;
+  const alertsEl = document.getElementById('alerts');
+  if (!alertsEl) return;
+
+  const sep = `<div style="margin:10px 0 6px;font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px">─── Alert Budget ───</div>`;
+  alertsEl.insertAdjacentHTML('beforeend',
+    sep + budgetAlerts.map(a=>`
+      <div class="al ${a.type}">
+        <div class="al-ic">${a.icon}</div>
+        <div class="al-b"><strong>${a.t}</strong><p>${a.b}</p></div>
+      </div>`).join('')
+  );
+
+  // Aggiorna badge con alert budget
+  const nbadge = document.getElementById('nbadge');
+  if (nbadge) {
+    const curr = parseInt(nbadge.textContent)||0;
+    const extra = offTrack.length + atRisk.length;
+    if (extra > 0) nbadge.textContent = curr + extra;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT BUTTON nel pannello budget (aggiunto via DOM)
+// ═══════════════════════════════════════════════════════
+// Aggiungi bottone Export CSV alla toolbar budget quando il DOM è pronto
+document.addEventListener('DOMContentLoaded', () => {
+  const bgToolbar = document.getElementById('bg-csv');
+  if (bgToolbar && bgToolbar.parentElement) {
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'bsm';
+    exportBtn.title = 'Esporta budget in CSV';
+    exportBtn.textContent = '📤 Esporta CSV';
+    exportBtn.onclick = exportBudgetCSV;
+    bgToolbar.parentElement.appendChild(exportBtn);
+  }
+});
