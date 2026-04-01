@@ -16,6 +16,14 @@ const CASCOS_EX  = /PFA\s*\d+|STD\s*72|FORBICE|SCHEDA|CENTRALINA|POMPA|FOTOCELLU
 
 let G={}, F={}, CMP=false, charts={}, sortState={};
 const BUDGET_KEY='pza-budgets-v1';
+const DEFAULT_BUDGETS=[
+  {
+    year:2026,
+    agente:'PEZZALI',
+    budget:1126000,
+    months:[65369,98076,116019,96346,79460,94418,106966,19579,89951,109920,140980,108916]
+  }
+];
 
 function tc(){
   const dark = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -34,25 +42,46 @@ function tc(){
 }
 
 
-
+function normalizeBudgetRow(r){
+  const months=Array.isArray(r.months)&&r.months.length===12
+    ? r.months.map(v=>num(v))
+    : null;
+  const budget=months?months.reduce((a,b)=>a+b,0):num(r.budget);
+  return {
+    year:parseInt(r.year)||0,
+    agente:str(r.agente).toUpperCase(),
+    budget,
+    months
+  };
+}
+function mergeBudgetRows(baseRows, overrideRows){
+  const map=new Map();
+  [...(baseRows||[]), ...(overrideRows||[])].forEach(r=>{
+    const row=normalizeBudgetRow(r);
+    if(row.year>2000&&row.agente&&row.budget>=0) map.set(`${row.year}__${row.agente}`,row);
+  });
+  return [...map.values()].sort((a,b)=>a.year-b.year||a.agente.localeCompare(b.agente,'it'));
+}
 function loadBudgets(){
   try{
     const raw=JSON.parse(localStorage.getItem(BUDGET_KEY)||'[]');
-    return Array.isArray(raw)?raw.map(r=>({
-      year:parseInt(r.year)||0,
-      agente:str(r.agente).toUpperCase(),
-      budget:num(r.budget)
-    })).filter(r=>r.year>2000&&r.agente&&r.budget>=0):[];
-  }catch(e){return [];}
+    return mergeBudgetRows(DEFAULT_BUDGETS, Array.isArray(raw)?raw:[]);
+  }catch(e){return mergeBudgetRows(DEFAULT_BUDGETS,[]);}
 }
 function saveBudgets(list){
-  localStorage.setItem(BUDGET_KEY,JSON.stringify((list||[]).sort((a,b)=>a.year-b.year||a.agente.localeCompare(b.agente,'it'))));
+  localStorage.setItem(BUDGET_KEY,JSON.stringify((list||[]).map(normalizeBudgetRow).sort((a,b)=>a.year-b.year||a.agente.localeCompare(b.agente,'it'))));
 }
-function periodMonthFactor(){
+function activePeriodMonths(){
   const perVal=(document.getElementById('f-per')||{}).value||'';
-  if(perVal.startsWith('q')) return 3/12;
-  if(perVal.startsWith('m')) return 1/12;
-  return 1;
+  if(perVal.startsWith('q')){const q=parseInt(perVal[1])-1;return [q*3,q*3+1,q*3+2];}
+  if(perVal.startsWith('m')) return [parseInt(perVal.slice(1))-1];
+  return null;
+}
+function getBudgetActiveValue(row){
+  const months=activePeriodMonths();
+  if(!months||months.length===12) return row.budget;
+  if(Array.isArray(row.months)&&row.months.length===12) return months.reduce((s,m)=>s+num(row.months[m]||0),0);
+  return row.budget*(months.length/12);
 }
 function activeYears(){
   const annoDa=parseInt((document.getElementById('f-da')||{}).value)||0;
@@ -63,10 +92,9 @@ function activeYears(){
 }
 function getActiveBudgetEntries(filteredAgent=''){
   const years=activeYears();
-  const factor=periodMonthFactor();
   return (G.budgets||[])
     .filter(r=>years.includes(r.year) && (!filteredAgent || r.agente===filteredAgent))
-    .map(r=>({...r,budgetActive:r.budget*factor}));
+    .map(r=>({...r,budgetActive:getBudgetActiveValue(r)}));
 }
 function getActiveBudgetMap(filteredAgent=''){
   const out={};
@@ -107,12 +135,13 @@ function renderBudgetManager(){
   seedBudgetAgentSelect();
   const y=parseInt(ySel.value)||years[years.length-1]||new Date().getFullYear();
   const rows=(G.budgets||[]).filter(r=>r.year===y).sort((a,b)=>b.budget-a.budget||a.agente.localeCompare(b.agente,'it'));
-  tbl('tbl-budget',['Anno','Agente/Commerciale','Budget','Azioni'],
+  tbl('tbl-budget',['Anno','Agente/Commerciale','Budget','Profilo','Azioni'],
     rows.map(r=>[
       `<span class="mono">${r.year}</span>`,
       r.agente,
       `<span class="mono">${fmt(r.budget)}</span>`,
-      `<button class="bsm" onclick="loadBudgetIntoForm(${r.year},'${r.agente.replace(/'/g,"\\'")}')">Modifica</button> <button class="bsm" onclick="removeBudget(${r.year},'${r.agente.replace(/'/g,"\\'")}')">Elimina</button>`
+      Array.isArray(r.months)&&r.months.length===12?'<span class="bdg bb">mensile</span>':'<span class="bdg bp">uniforme</span>',
+      `<button class="bsm" onclick="loadBudgetIntoForm(${r.year},'${r.agente.replace(/'/g,"\'")}')">Modifica</button> <button class="bsm" onclick="removeBudget(${r.year},'${r.agente.replace(/'/g,"\'")}')">Elimina</button>`
     ])
   );
   const total=rows.reduce((a,r)=>a+r.budget,0);
